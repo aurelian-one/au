@@ -109,19 +109,87 @@ var listCommand = &cobra.Command{
 }
 
 var useCommand = &cobra.Command{
-	Use: "use",
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:        "use <uid>",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"uid"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configDir, _ := cmd.Flags().GetString("directory")
+		c := &au.ConfigDirectory{Path: configDir}
+
+		workspacePath := filepath.Join(c.Path, args[0]+".automerge")
+		_, err := os.Stat(workspacePath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("workspace does not exist")
+			}
+			return errors.Wrap(err, "failed to check for workspace")
+		}
+
+		raw, err := os.ReadFile(workspacePath)
+		if err != nil {
+			return errors.Wrap(err, "failed to read workspace file")
+		}
+		doc, err := automerge.Load(raw)
+		if err != nil {
+			return errors.Wrap(err, "failed to preview workspace file")
+		}
+		aliasValue, _ := doc.Path("alias").Get()
+
+		if err := os.Remove(filepath.Join(c.Path, "current")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return errors.Wrap(err, "failed to remove old symlink")
+		}
+		if err := os.Symlink(workspacePath, filepath.Join(c.Path, "current")); err != nil {
+			return errors.Wrap(err, "failed to symlink")
+		}
+		slog.Debug(fmt.Sprintf("Set workspace %s (%s@%s) to be the default workspace", aliasValue.Str(), args[0], doc.Heads()))
+		return nil
 	},
 }
 
 var deleteCommand = &cobra.Command{
-	Use: "delete",
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:        "delete <uid>",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"uid"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configDir, _ := cmd.Flags().GetString("directory")
+		c := &au.ConfigDirectory{Path: configDir}
+
+		workspacePath := filepath.Join(c.Path, args[0]+".automerge")
+		_, err := os.Stat(workspacePath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("workspace does not exist")
+			}
+			return errors.Wrap(err, "failed to check for workspace")
+		}
+
+		confirmed, err := au.Confirm(fmt.Sprintf("Are you sure you want to delete workspace %s in directory %s?", args[0], configDir), os.Stdout, os.Stdin)
+		if err != nil {
+			return errors.Wrap(err, "failed to confirm")
+		}
+		if !confirmed {
+			return &common.ExitWithCode{Code: 1}
+		}
+
+		symlinkPath := filepath.Join(c.Path, "current")
+		symlinkDest, err := os.Readlink(symlinkPath)
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return errors.Wrap(err, "failed to check for symlink")
+			}
+		} else if symlinkDest == workspacePath {
+			if err := os.Remove(symlinkPath); err != nil {
+				return errors.Wrap(err, "failed to remove symlink")
+			}
+		}
+		if err := os.Remove(workspacePath); err != nil {
+			return errors.Wrap(err, "failed to remove workspace")
+		}
+		return nil
 	},
 }
 
 func init() {
-
 	Command.AddCommand(
 		initCommand,
 		listCommand,
