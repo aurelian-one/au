@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/aurelian-one/au/cmd/au/common"
 	"github.com/aurelian-one/au/pkg/au"
@@ -41,14 +42,15 @@ var listCommand = &cobra.Command{
 		if err != nil {
 			return errors.Wrap(err, "failed to list workspaces")
 		}
+		output := make([]*au.WorkspaceMetadata, 0, len(workspaceUids))
 		for _, uid := range workspaceUids {
-			var suffix string
-			if uid == c.CurrentUid {
-				suffix = " (current)"
+			metadata, err := c.GetWorkspaceMetadata(uid)
+			if err != nil {
+				return errors.Wrap(err, "failed to read metadata")
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", uid, suffix)
+			output = append(output, metadata)
 		}
-		return nil
+		return yaml.NewEncoder(os.Stdout).Encode(output)
 	},
 }
 

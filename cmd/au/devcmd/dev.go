@@ -2,7 +2,6 @@ package devcmd
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/automerge/automerge-go"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/aurelian-one/au/cmd/au/common"
 	"github.com/aurelian-one/au/pkg/au"
@@ -35,7 +35,9 @@ var dumpCommand = &cobra.Command{
 		if err != nil {
 			return errors.Wrap(err, "failed to preview workspace file")
 		}
-		return json.NewEncoder(os.Stdout).Encode(toTree(doc.Root()))
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(toTree(doc.Root()))
 	},
 }
 

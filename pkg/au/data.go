@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/automerge/automerge-go"
 	"github.com/oklog/ulid/v2"
@@ -94,6 +95,34 @@ func (c *ConfigDirectory) ListWorkspaceUids() ([]string, error) {
 	return workspaceUids, nil
 }
 
+type WorkspaceMetadata struct {
+	Alias     string    `yaml:"alias"`
+	Uid       string    `yaml:"uid"`
+	CreatedAt time.Time `yaml:"created_at"`
+	SizeBytes int       `yaml:"size_bytes"`
+	IsCurrent bool      `yaml:"is_current,omitempty"`
+}
+
+func (c *ConfigDirectory) GetWorkspaceMetadata(uid string) (*WorkspaceMetadata, error) {
+	data, err := os.ReadFile(filepath.Join(c.Path, uid+".automerge"))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read document")
+	}
+	doc, err := automerge.Load(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load document")
+	}
+	aliasValue, _ := doc.Path("alias").Get()
+	createdAtValue, _ := doc.Path("created_at").Get()
+	return &WorkspaceMetadata{
+		Uid:       uid,
+		Alias:     aliasValue.Str(),
+		CreatedAt: createdAtValue.Time(),
+		SizeBytes: len(data),
+		IsCurrent: uid == c.CurrentUid,
+	}, nil
+}
+
 func (c *ConfigDirectory) CreateNewWorkspace(alias string) (string, error) {
 	proposedUid := ulid.Make().String()
 	proposedAlias := strings.TrimSpace(alias)
@@ -103,6 +132,7 @@ func (c *ConfigDirectory) CreateNewWorkspace(alias string) (string, error) {
 	workspacePath := filepath.Join(c.Path, proposedUid+".automerge")
 	doc := automerge.New()
 	_ = doc.Path("alias").Set(proposedAlias)
+	_ = doc.Path("created_at").Set(time.Now().UTC())
 	if err := doc.Path("todos").Set(&automerge.Map{}); err != nil {
 		return "", errors.Wrap(err, "failed to setup todos map")
 	}
