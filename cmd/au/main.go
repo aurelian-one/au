@@ -56,15 +56,13 @@ goals 🤖. Development and debug commands are also provided.`,
 		if err := setupLogger(cmd); err != nil {
 			return err
 		}
-		if err := resolveConfigDirectory(cmd, "directory"); err != nil {
+		if err := resolveConfigDirectoryAndWorkspace(cmd, "directory", "current-workspace"); err != nil {
 			return err
 		}
-		// By default, we silence help generation when running the Run functions. These can be enabled by specific
-		// functions if they need to trigger usage.
-		cmd.SilenceUsage = true
-		cmd.SilenceErrors = true
 		return nil
 	},
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func setupLogger(cmd *cobra.Command) error {
@@ -88,16 +86,28 @@ func setupLogger(cmd *cobra.Command) error {
 	return nil
 }
 
-func resolveConfigDirectory(cmd *cobra.Command, flagName string) error {
-	value, err := cmd.Flags().GetString(flagName)
+func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string, workspaceFlag string) error {
+	directoryValue, err := cmd.Flags().GetString(directoryFlag)
 	if err != nil {
 		return err
 	}
-	value, err = au.ResolveConfigDirectory(value)
+	directoryValue, err = au.ResolveConfigDirectory(directoryValue)
 	if err != nil {
 		return err
 	}
-	return cmd.Flags().Set(flagName, value)
+	workspaceValue, err := cmd.Flags().GetString(workspaceFlag)
+	if err != nil {
+		return err
+	}
+	workspaceValue, err = au.ResolveWorkspaceUid(directoryValue, workspaceValue)
+	if err != nil {
+		return err
+	}
+	cmd.SetContext(context.WithValue(cmd.Context(), common.ConfigDirectoryContextKey, &au.ConfigDirectory{
+		Path:       directoryValue,
+		CurrentUid: workspaceValue,
+	}))
+	return nil
 }
 
 func init() {
@@ -112,6 +122,12 @@ func init() {
 The path of the config directory to operate in. If no value is provided, this will fallback to $%s before 
 falling back to %s".`, au.ConfigDirEnvironmentVariable, au.DefaultConfigDir)),
 	)
+	rootCmd.PersistentFlags().String(
+		"current-workspace", "",
+		strings.TrimSpace(fmt.Sprintf(`
+The uid of the target workspace to operate in. If no value is provided, this will fallback to $%s before 
+falling back to current symlink".`, au.WorkspaceUidEnvironmentVariable)),
+	)
 
 	rootCmd.AddCommand(
 		workspacecmd.Command,
@@ -122,13 +138,13 @@ falling back to %s".`, au.ConfigDirEnvironmentVariable, au.DefaultConfigDir)),
 
 func main() {
 	if err := mainInner(); err != nil && !errors.Is(err, flag.ErrHelp) {
-		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+		if v, _ := rootCmd.Flags().GetInt("debug"); v >= 2 {
 			_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "%+v\n", err)
 		}
 		if ee := new(common.ExitWithCode); errors.As(err, &ee) {
 			os.Exit(ee.Code)
 		} else {
-			_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "%v\n", err)
+			_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %v\n", err)
 			os.Exit(1)
 		}
 	}
