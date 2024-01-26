@@ -20,7 +20,7 @@ var Command = &cobra.Command{
 }
 
 var dumpCommand = &cobra.Command{
-	Use:  "export",
+	Use:  "export-workspace",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
@@ -38,6 +38,45 @@ var dumpCommand = &cobra.Command{
 		encoder := yaml.NewEncoder(os.Stdout)
 		encoder.SetIndent(2)
 		return encoder.Encode(toTree(doc.Root()))
+	},
+}
+
+var historyCommand = &cobra.Command{
+	Use:  "show-workspace-history",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
+		if c.CurrentUid == "" {
+			return errors.New("no current workspace set")
+		}
+		raw, err := os.ReadFile(filepath.Join(c.Path, c.CurrentUid+".automerge"))
+		if err != nil {
+			return errors.Wrap(err, "failed to read workspace file")
+		}
+		doc, err := automerge.Load(raw)
+		if err != nil {
+			return errors.Wrap(err, "failed to preview workspace file")
+		}
+		output := make([]map[string]interface{}, 0)
+		changes, err := doc.Changes()
+		if err != nil {
+			return errors.Wrap(err, "failed to get changes")
+		}
+		for _, change := range changes {
+			dependencies := make([]string, 0)
+			for _, hash := range change.Dependencies() {
+				dependencies = append(dependencies, hash.String())
+			}
+			output = append(output, map[string]interface{}{
+				"hash":         change.Hash().String(),
+				"at":           change.Timestamp(),
+				"message":      change.Message(),
+				"dependencies": dependencies,
+			})
+		}
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(output)
 	},
 }
 
@@ -87,5 +126,6 @@ func toTree(item *automerge.Value) interface{} {
 func init() {
 	Command.AddCommand(
 		dumpCommand,
+		historyCommand,
 	)
 }

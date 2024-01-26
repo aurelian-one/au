@@ -30,6 +30,9 @@ var getCommand = &cobra.Command{
 func amvToStr(v *automerge.Value, def string) string {
 	if v.Kind() == automerge.KindVoid {
 		return def
+	} else if v.Kind() == automerge.KindText {
+		sv, _ := v.Text().Get()
+		return sv
 	}
 	return v.Str()
 }
@@ -42,7 +45,8 @@ func amvToTime(v *automerge.Value, def time.Time) time.Time {
 }
 
 var listCommand = &cobra.Command{
-	Use: "list",
+	Use:  "list",
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
 		if c.CurrentUid == "" {
@@ -66,11 +70,13 @@ var listCommand = &cobra.Command{
 			titleValue, _ := item.Map().Get("title")
 			statusValue, _ := item.Map().Get("status")
 			createdAtValue, _ := item.Map().Get("created_at")
+			descriptionValue, _ := item.Map().Get("description")
 			output = append(output, map[string]interface{}{
-				"id":         id,
-				"title":      amvToStr(titleValue, ""),
-				"status":     amvToStr(statusValue, "open"),
-				"created_at": amvToTime(createdAtValue, time.Unix(0, 0)),
+				"id":          id,
+				"title":       amvToStr(titleValue, ""),
+				"status":      amvToStr(statusValue, "open"),
+				"created_at":  amvToTime(createdAtValue, time.Unix(0, 0)),
+				"description": amvToStr(descriptionValue, ""),
 			})
 		}
 		slices.SortFunc(output, func(a, b map[string]interface{}) int {
@@ -122,7 +128,7 @@ var createCommand = &cobra.Command{
 
 		if v, err := cmd.Flags().GetString("description"); err != nil {
 			return errors.Wrap(err, "failed to get description flag")
-		} else if err := newTodo.Set("description", v); err != nil {
+		} else if err := newTodo.Set("description", automerge.NewText(v)); err != nil {
 			return errors.Wrap(err, "failed to set description")
 		}
 
@@ -138,14 +144,44 @@ var createCommand = &cobra.Command{
 }
 
 var editCommand = &cobra.Command{
-	Use: "edit",
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:        "edit <uid>",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"uid"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return errors.New("not implemented")
 	},
 }
 
 var deleteCommand = &cobra.Command{
-	Use: "delete",
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:        "delete <uid>",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"uid"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
+		if c.CurrentUid == "" {
+			return errors.New("no current workspace set")
+		}
+		raw, err := os.ReadFile(filepath.Join(c.Path, c.CurrentUid+".automerge"))
+		if err != nil {
+			return errors.Wrap(err, "failed to read workspace file")
+		}
+		doc, err := automerge.Load(raw)
+		if err != nil {
+			return errors.Wrap(err, "failed to preview workspace file")
+		}
+
+		todos := doc.Path("todos").Map()
+		todoUid := cmd.Flags().Arg(0)
+		if err := todos.Delete(todoUid); err != nil {
+			return errors.Wrap(err, "failed to delete todo entry")
+		}
+		if _, err := doc.Commit("removed todo " + todoUid); err != nil {
+			return errors.Wrap(err, "failed to commit")
+		}
+		if err := os.WriteFile(filepath.Join(c.Path, c.CurrentUid+".automerge"), doc.Save(), os.FileMode(0600)); err != nil {
+			return errors.Wrap(err, "failed to write file")
+		}
+		return nil
 	},
 }
 
