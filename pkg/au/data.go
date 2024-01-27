@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -104,11 +105,14 @@ func (c *ConfigDirectory) ListWorkspaceUids() ([]string, error) {
 }
 
 type WorkspaceMetadata struct {
+	Uid string `yaml:"uid"`
+
 	Alias     string    `yaml:"alias"`
-	Uid       string    `yaml:"uid"`
 	CreatedAt time.Time `yaml:"created_at"`
-	SizeBytes int       `yaml:"size_bytes"`
-	IsCurrent bool      `yaml:"is_current,omitempty"`
+
+	SizeBytes int      `yaml:"size_bytes"`
+	IsCurrent bool     `yaml:"is_current,omitempty"`
+	Heads     []string `yaml:"heads"`
 }
 
 func (c *ConfigDirectory) GetWorkspaceMetadata(uid string) (*WorkspaceMetadata, error) {
@@ -122,12 +126,18 @@ func (c *ConfigDirectory) GetWorkspaceMetadata(uid string) (*WorkspaceMetadata, 
 	}
 	aliasValue, _ := doc.Path("alias").Get()
 	createdAtValue, _ := doc.Path("created_at").Get()
+	heads := make([]string, 0)
+	for _, hash := range doc.Heads() {
+		heads = append(heads, hash.String())
+	}
+	slices.Sort(heads)
 	return &WorkspaceMetadata{
 		Uid:       uid,
 		Alias:     aliasValue.Str(),
 		CreatedAt: createdAtValue.Time(),
 		SizeBytes: len(data),
 		IsCurrent: uid == c.CurrentUid,
+		Heads:     heads,
 	}, nil
 }
 
@@ -144,7 +154,7 @@ func (c *ConfigDirectory) CreateNewWorkspace(alias string) (string, error) {
 	if err := doc.Path("todos").Set(&automerge.Map{}); err != nil {
 		return "", errors.Wrap(err, "failed to setup todos map")
 	}
-	changeHash, err := doc.Commit("Init", automerge.CommitOptions{AllowEmpty: true})
+	changeHash, err := doc.Commit(fmt.Sprintf("Init %s", proposedAlias), automerge.CommitOptions{AllowEmpty: true})
 	if err != nil {
 		return "", errors.Wrap(err, "failed to commit")
 	}
@@ -201,6 +211,9 @@ func (c *ConfigDirectory) ListenAndServe(ctx context.Context, address string) er
 		if err := auws.Sync(request.Context(), slog.Default(), conn, doc, false); err != nil {
 			slog.Error("failed to sync", "err", err)
 			_ = conn.Close()
+		}
+		if err := os.WriteFile(filepath.Join(c.Path, uid+".automerge"), doc.Save(), os.FileMode(0600)); err != nil {
+			slog.Error("failed to write destination file", "err", err)
 		}
 	})).Methods(http.MethodGet)
 	m.Handle("/workspaces/{uid}/raw", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

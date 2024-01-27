@@ -44,6 +44,14 @@ func amvToTime(v *automerge.Value, def time.Time) time.Time {
 	return v.Time()
 }
 
+type outputTodo struct {
+	Id          string    `yaml:"id"`
+	Title       string    `yaml:"title"`
+	Description string    `yaml:"description"`
+	Status      string    `yaml:"status"`
+	CreatedAt   time.Time `yaml:"created_at"`
+}
+
 var listCommand = &cobra.Command{
 	Use:  "list",
 	Args: cobra.NoArgs,
@@ -63,7 +71,7 @@ var listCommand = &cobra.Command{
 
 		todos := doc.Path("todos").Map()
 
-		output := make([]map[string]interface{}, 0)
+		output := make([]outputTodo, 0)
 		todoIds, _ := todos.Keys()
 		for _, id := range todoIds {
 			item, _ := todos.Get(id)
@@ -71,19 +79,20 @@ var listCommand = &cobra.Command{
 			statusValue, _ := item.Map().Get("status")
 			createdAtValue, _ := item.Map().Get("created_at")
 			descriptionValue, _ := item.Map().Get("description")
-			output = append(output, map[string]interface{}{
-				"id":          id,
-				"title":       amvToStr(titleValue, ""),
-				"status":      amvToStr(statusValue, "open"),
-				"created_at":  amvToTime(createdAtValue, time.Unix(0, 0)),
-				"description": amvToStr(descriptionValue, ""),
+			output = append(output, outputTodo{
+				Id:          id,
+				Title:       amvToStr(titleValue, ""),
+				Status:      amvToStr(statusValue, "open"),
+				CreatedAt:   amvToTime(createdAtValue, time.Unix(0, 0)),
+				Description: amvToStr(descriptionValue, ""),
 			})
 		}
-		slices.SortFunc(output, func(a, b map[string]interface{}) int {
-			aT, bT := a["created_at"].(time.Time), b["created_at"].(time.Time)
-			return aT.Compare(bT)
+		slices.SortFunc(output, func(a, b outputTodo) int {
+			return a.CreatedAt.Compare(b.CreatedAt)
 		})
-		return yaml.NewEncoder(os.Stdout).Encode(output)
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(output)
 	},
 }
 
@@ -135,11 +144,23 @@ var createCommand = &cobra.Command{
 		if _, err := doc.Commit("added todo " + todoUid); err != nil {
 			return errors.Wrap(err, "failed to commit")
 		}
-
 		if err := os.WriteFile(filepath.Join(c.Path, c.CurrentUid+".automerge"), doc.Save(), os.FileMode(0600)); err != nil {
 			return errors.Wrap(err, "failed to write file")
 		}
-		return nil
+
+		titleValue, _ := newTodo.Get("title")
+		statusValue, _ := newTodo.Get("status")
+		createdAtValue, _ := newTodo.Get("created_at")
+		descriptionValue, _ := newTodo.Get("description")
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(outputTodo{
+			Id:          todoUid,
+			Title:       amvToStr(titleValue, ""),
+			Status:      amvToStr(statusValue, "open"),
+			CreatedAt:   amvToTime(createdAtValue, time.Unix(0, 0)),
+			Description: amvToStr(descriptionValue, ""),
+		})
 	},
 }
 

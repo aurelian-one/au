@@ -2,6 +2,8 @@ package devcmd
 
 import (
 	"encoding/base64"
+	"fmt"
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"time"
@@ -80,6 +82,49 @@ var historyCommand = &cobra.Command{
 	},
 }
 
+var generateDotCommand = &cobra.Command{
+	Use:  "generate-dot",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
+		if c.CurrentUid == "" {
+			return errors.New("no current workspace set")
+		}
+		raw, err := os.ReadFile(filepath.Join(c.Path, c.CurrentUid+".automerge"))
+		if err != nil {
+			return errors.Wrap(err, "failed to read workspace file")
+		}
+		doc, err := automerge.Load(raw)
+		if err != nil {
+			return errors.Wrap(err, "failed to preview workspace file")
+		}
+
+		_, _ = fmt.Fprintln(os.Stdout, "strict digraph {")
+		_, _ = fmt.Fprintf(os.Stdout, "node [colorscheme=pastel19]")
+		changes, err := doc.Changes()
+		if err != nil {
+			return errors.Wrap(err, "failed to get changes")
+		}
+		for _, change := range changes {
+			var color int
+			{
+				h := crc32.NewIEEE()
+				_, _ = h.Write([]byte(change.ActorID()))
+				color = 1 + int(h.Sum32()%9)
+			}
+			_, _ = fmt.Fprintf(
+				os.Stdout, "\"%s\" [label=\"%s %s: '%s'\", style=\"filled\" fillcolor=%d]\n",
+				change.Hash().String(), change.Hash().String()[:8], change.Timestamp().Format(time.RFC3339), change.Message(), color,
+			)
+			for _, hash := range change.Dependencies() {
+				_, _ = fmt.Fprintf(os.Stdout, "\"%s\" -> \"%s\"\n", hash.String(), change.Hash().String())
+			}
+		}
+		_, _ = fmt.Fprintln(os.Stdout, "}")
+		return nil
+	},
+}
+
 func toTree(item *automerge.Value) interface{} {
 	switch item.Kind() {
 	case automerge.KindMap:
@@ -127,5 +172,6 @@ func init() {
 	Command.AddCommand(
 		dumpCommand,
 		historyCommand,
+		generateDotCommand,
 	)
 }
