@@ -25,11 +25,17 @@ var initCommand = &cobra.Command{
 		if err := c.Init(); err != nil {
 			return errors.Wrap(err, "failed to init directory")
 		}
-		_, err := c.CreateNewWorkspace(args[0])
+		uid, err := c.CreateNewWorkspace(args[0])
 		if err != nil {
 			return err
 		}
-		return nil
+		metadata, err := c.GetWorkspaceMetadata(uid)
+		if err != nil {
+			return err
+		}
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(metadata)
 	},
 }
 
@@ -50,7 +56,9 @@ var listCommand = &cobra.Command{
 			}
 			output = append(output, metadata)
 		}
-		return yaml.NewEncoder(os.Stdout).Encode(output)
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(output)
 	},
 }
 
@@ -65,7 +73,16 @@ var useCommand = &cobra.Command{
 		} else if !exists {
 			return errors.New("workspace does not exist")
 		}
-		return errors.Wrap(c.ChangeCurrentWorkspaceUid(args[0]), "failed to change current workspace")
+		if err := c.ChangeCurrentWorkspaceUid(args[0]); err != nil {
+			return errors.Wrap(err, "failed to change current workspace")
+		}
+		metadata, err := c.GetWorkspaceMetadata(args[0])
+		if err != nil {
+			return err
+		}
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(metadata)
 	},
 }
 
@@ -91,11 +108,47 @@ var deleteCommand = &cobra.Command{
 	},
 }
 
+var syncServerCommand = &cobra.Command{
+	Use:        "serve <localhost:80>",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"address"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
+		return c.ListenAndServe(cmd.Context(), cmd.Flags().Arg(0))
+	},
+}
+
+var syncClientCommand = &cobra.Command{
+	Use:        "sync <ws://localhost:80>",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"address"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
+		if c.CurrentUid == "" {
+			return errors.New("no current workspace set")
+		}
+		return c.ConnectAndSync(cmd.Context(), c.CurrentUid, cmd.Flags().Arg(0))
+	},
+}
+
+var syncImportCommand = &cobra.Command{
+	Use:        "sync-import <http://localhost:80>",
+	Args:       cobra.ExactArgs(2),
+	ArgAliases: []string{"address", "uid"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
+		return c.ConnectAndImport(cmd.Context(), args[1], args[0])
+	},
+}
+
 func init() {
 	Command.AddCommand(
 		initCommand,
 		listCommand,
 		useCommand,
 		deleteCommand,
+		syncServerCommand,
+		syncClientCommand,
+		syncImportCommand,
 	)
 }

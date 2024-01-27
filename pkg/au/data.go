@@ -1,16 +1,24 @@
 package au
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/automerge/automerge-go"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
+
+	"github.com/aurelian-one/au/pkg/auws"
 )
 
 type ConfigDirectory struct {
@@ -74,7 +82,7 @@ func (c *ConfigDirectory) ChangeCurrentWorkspaceUid(uid string) error {
 	if err := os.Symlink(filepath.Join(c.Path, uid+".automerge"), filepath.Join(c.Path, "current")); err != nil {
 		return errors.Wrap(err, "failed to symlink")
 	}
-	slog.Info(fmt.Sprintf("Set new current workspace %s.", uid))
+	slog.Debug(fmt.Sprintf("Set new current workspace %s.", uid))
 	return nil
 }
 
@@ -147,7 +155,7 @@ func (c *ConfigDirectory) CreateNewWorkspace(alias string) (string, error) {
 	if err := c.ChangeCurrentWorkspaceUid(proposedUid); err != nil {
 		return "", err
 	}
-	slog.Info(fmt.Sprintf("Initialised new workspace '%s' (%s@%s) and set it as default.", proposedAlias, proposedUid, changeHash))
+	slog.Debug(fmt.Sprintf("Initialised new workspace '%s' (%s@%s) and set it as default.", proposedAlias, proposedUid, changeHash))
 	return proposedUid, nil
 }
 
@@ -160,6 +168,125 @@ func (c *ConfigDirectory) DeleteWorkspace(uid string) error {
 	if err := os.Remove(filepath.Join(c.Path, uid+".automerge")); err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "failed to remove workspace")
 	}
-	slog.Info(fmt.Sprintf("Deleted workspace %s.", uid))
+	slog.Debug(fmt.Sprintf("Deleted workspace %s.", uid))
+	return nil
+}
+
+func (c *ConfigDirectory) ListenAndServe(ctx context.Context, address string) error {
+	m := mux.NewRouter()
+	m.Handle("/workspaces/{uid}/actions/sync", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		uid := mux.Vars(request)["uid"]
+		raw, err := os.ReadFile(filepath.Join(c.Path, uid+".automerge"))
+		if err != nil {
+			slog.Error("failed to read workspace file", "err", err)
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		doc, err := automerge.Load(raw)
+		if err != nil {
+			slog.Error("failed to load workspace file", "err", err)
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		upgrader := websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		}
+		conn, err := upgrader.Upgrade(writer, request, nil)
+		if err != nil {
+			slog.Error("failed to upgrade", "err", err)
+			return
+		}
+		defer conn.Close()
+		if err := auws.Sync(request.Context(), slog.Default(), conn, doc, false); err != nil {
+			slog.Error("failed to sync", "err", err)
+			_ = conn.Close()
+		}
+	})).Methods(http.MethodGet)
+	m.Handle("/workspaces/{uid}/raw", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		uid := mux.Vars(request)["uid"]
+		raw, err := os.ReadFile(filepath.Join(c.Path, uid+".automerge"))
+		if err != nil {
+			slog.Error("failed to read workspace file", "err", err)
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		doc, err := automerge.Load(raw)
+		if err != nil {
+			slog.Error("failed to load workspace file", "err", err)
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, _ = writer.Write(doc.Save())
+	})).Methods(http.MethodGet)
+	server := http.Server{Addr: address, Handler: m}
+	go func() {
+		<-ctx.Done()
+		_ = server.Close()
+	}()
+	return server.ListenAndServe()
+}
+
+func (c *ConfigDirectory) ConnectAndSync(ctx context.Context, uid string, address string) error {
+	baseUrl, err := url.Parse(address)
+	if err != nil {
+		return errors.Wrap(err, "invalid url")
+	}
+	raw, err := os.ReadFile(filepath.Join(c.Path, uid+".automerge"))
+	if err != nil {
+		return errors.Wrap(err, "failed to read workspace file")
+	}
+	doc, err := automerge.Load(raw)
+	if err != nil {
+		return errors.Wrap(err, "failed to preview workspace file")
+	}
+
+	baseUrl.Scheme = "ws"
+	baseUrl.RawQuery = ""
+	baseUrl.RawFragment = ""
+	baseUrl = baseUrl.JoinPath("workspaces", uid, "actions", "sync")
+	conn, _, err := websocket.DefaultDialer.Dial(baseUrl.String(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to dial: %w", err)
+	}
+	defer conn.Close()
+
+	if err := auws.Sync(ctx, slog.Default(), conn, doc, true); err != nil {
+		return fmt.Errorf("failed to sync: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(c.Path, uid+".automerge"), doc.Save(), os.FileMode(0600)); err != nil {
+		return errors.Wrap(err, "failed to write destination file")
+	}
+	return nil
+}
+
+func (c *ConfigDirectory) ConnectAndImport(ctx context.Context, uid string, address string) error {
+	if ok, err := c.DoesWorkspaceExist(uid); err != nil {
+		return errors.Wrap(err, "failed to check workspace")
+	} else if ok {
+		return errors.Wrap(err, "workspace already exists - did you mean to sync instead?")
+	}
+
+	baseUrl, err := url.Parse(address)
+	if err != nil {
+		return errors.Wrap(err, "invalid url")
+	}
+	baseUrl.RawQuery = ""
+	baseUrl.RawFragment = ""
+	baseUrl = baseUrl.JoinPath("workspaces", uid, "raw")
+
+	resp, err := http.DefaultClient.Get(baseUrl.String())
+	if err != nil {
+		return fmt.Errorf("failed to request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	f, err := os.OpenFile(filepath.Join(c.Path, uid+".automerge"), os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return errors.Wrap(err, "failed to open destination file")
+	}
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return errors.Wrap(err, "failed to write destination file")
+	}
 	return nil
 }

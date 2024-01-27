@@ -66,7 +66,7 @@ goals 🤖. Development and debug commands are also provided.`,
 }
 
 func setupLogger(cmd *cobra.Command) error {
-	handlerOptions := &slog.HandlerOptions{AddSource: false, Level: slog.LevelInfo}
+	handlerOptions := &slog.HandlerOptions{AddSource: false, Level: slog.LevelError}
 	if debugValue, err := cmd.Flags().GetInt("debug"); err != nil {
 		return err
 	} else if debugValue == 1 {
