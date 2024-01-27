@@ -26,3 +26,12 @@ jobs:
 
     - name: Test
       run: go test -v -race -cover ./...
+
+    - name: Vet
+      run: go vet ./...
+
+    - name: Go mod tidy
+      run: go mod tidy
+
+    - name: Check diff
+      run: git diff --exit-code
