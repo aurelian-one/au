@@ -22,7 +22,7 @@ jobs:
         go-version: '1.21'
 
     - name: Build
-      run: go build -v ./cmd/au -o au
+      run: go build -v -o au ./cmd/au
 
     - name: Test
       run: go test -v -race -cover ./...
