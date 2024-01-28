@@ -34,8 +34,5 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
 
-changelog:
-  disable: true
-
 checksum:
   disable: true
