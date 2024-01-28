@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -63,6 +65,15 @@ goals 🤖. Development and debug commands are also provided.`,
 	},
 	SilenceErrors: true,
 	SilenceUsage:  true,
+}
+
+var versionCmd = &cobra.Command{
+	Use:  "version",
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		intTimestamp, _ := strconv.Atoi(au.CommitTimestamp)
+		_, _ = fmt.Fprintf(os.Stdout, "%s (%s @ %s)\n", au.Version, au.Commit, time.Unix(int64(intTimestamp), 0))
+	},
 }
 
 func setupLogger(cmd *cobra.Command) error {
@@ -133,6 +144,7 @@ falling back to current symlink".`, au.WorkspaceUidEnvironmentVariable)),
 		workspacecmd.Command,
 		todocmd.Command,
 		devcmd.Command,
+		versionCmd,
 	)
 }
 

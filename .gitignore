@@ -19,3 +19,5 @@
 
 # Go workspacecmd file
 go.work
+
+dist/
