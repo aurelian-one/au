@@ -5,7 +5,6 @@ on:
     branches: [ "main" ]
 
 permissions:
-    contents: write
     packages: write
 
 jobs:
@@ -23,7 +22,7 @@ jobs:
         with:
           args: release --config .goreleaser-for-linux.yaml ${{ github.event_name == 'pull_request' && '--skip-publish' || '' }}
         env:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-darwin-binary:
     if: ${{ github.event_name == 'release' }}
@@ -39,4 +38,4 @@ jobs:
         with:
           args: release --config .goreleaser-for-darwin.yaml ${{ github.event_name == 'pull_request' && '--skip-publish' || '' }}
         env:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
