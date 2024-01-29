@@ -147,6 +147,8 @@ var editCommand = &cobra.Command{
 
 		if todo, err := ws.EditTodo(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
 			return err
+		} else if err := ws.Flush(); err != nil {
+			return errors.Wrap(err, "failed to flush to file")
 		} else {
 			encoder := yaml.NewEncoder(os.Stdout)
 			encoder.SetIndent(2)
@@ -173,6 +175,8 @@ var deleteCommand = &cobra.Command{
 
 		if err := ws.DeleteTodo(cmd.Context(), cmd.Flags().Arg(0)); err != nil {
 			return err
+		} else if err := ws.Flush(); err != nil {
+			return errors.Wrap(err, "failed to flush to file")
 		}
 		return nil
 	},

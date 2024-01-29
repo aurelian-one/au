@@ -236,31 +236,13 @@ func (d *directoryStorageWorkspace) GetTodo(ctx context.Context, id string) (*To
 }
 
 func (d *directoryStorageWorkspace) CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error) {
-	if t, err := d.Doc.CreateTodo(ctx, params); err != nil {
-		return nil, err
-	} else if err = d.Flush(); err != nil {
-		return nil, err
-	} else {
-		return t, nil
-	}
+	return d.Doc.CreateTodo(ctx, params)
 }
 
 func (d *directoryStorageWorkspace) EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error) {
-	if t, err := d.Doc.EditTodo(ctx, id, params); err != nil {
-		return nil, err
-	} else if err = d.Flush(); err != nil {
-		return nil, err
-	} else {
-		return t, nil
-	}
+	return d.Doc.EditTodo(ctx, id, params)
 }
 
 func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string) error {
-	if err := d.Doc.DeleteTodo(ctx, id); err != nil {
-		return err
-	} else if err = d.Flush(); err != nil {
-		return err
-	} else {
-		return nil
-	}
+	return d.Doc.DeleteTodo(ctx, id)
 }

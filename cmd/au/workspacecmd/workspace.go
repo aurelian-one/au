@@ -1,13 +1,18 @@
 package workspacecmd
 
 import (
+	"log/slog"
+	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/aurelian-one/au/cmd/au/common"
 	"github.com/aurelian-one/au/pkg/au"
+	"github.com/aurelian-one/au/pkg/auws"
 )
 
 var Command = &cobra.Command{
@@ -93,9 +98,62 @@ var syncServerCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"address"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return nil
-		//c := cmd.Context().Value(common.StorageContextKey).(*au.ConfigDirectory)
-		//return c.ListenAndServe(cmd.Context(), cmd.Flags().Arg(0))
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+
+		m := mux.NewRouter()
+		m.Handle("/workspaces/{uid}/actions/sync", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			uid := mux.Vars(request)["uid"]
+			ws, err := s.OpenWorkspace(cmd.Context(), uid, true)
+			if err != nil {
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			defer ws.Close()
+			defer ws.Flush()
+
+			dws, ok := ws.(au.DocProvider)
+			if !ok {
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			upgrader := websocket.Upgrader{
+				ReadBufferSize:  1024,
+				WriteBufferSize: 1024,
+			}
+			conn, err := upgrader.Upgrade(writer, request, nil)
+			if err != nil {
+				slog.Error("failed to upgrade", "err", err)
+				return
+			}
+			defer conn.Close()
+			if err := auws.Sync(request.Context(), slog.Default(), conn, dws.Doc(), false); err != nil {
+				slog.Error("failed to sync", "err", err)
+				_ = conn.Close()
+			}
+		})).Methods(http.MethodGet)
+		m.Handle("/workspaces/{uid}/raw", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			uid := mux.Vars(request)["uid"]
+
+			ws, err := s.OpenWorkspace(cmd.Context(), uid, false)
+			if err != nil {
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			defer ws.Close()
+
+			dws, ok := ws.(au.DocProvider)
+			if !ok {
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, _ = writer.Write(dws.Doc().Save())
+		})).Methods(http.MethodGet)
+		server := http.Server{Addr: cmd.Flags().Arg(0), Handler: m}
+		go func() {
+			<-cmd.Context().Done()
+			_ = server.Close()
+		}()
+		return server.ListenAndServe()
 	},
 }
 
