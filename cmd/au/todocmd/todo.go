@@ -3,7 +3,6 @@ package todocmd
 import (
 	"os"
 	"slices"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -91,8 +90,6 @@ var createCommand = &cobra.Command{
 
 		if v, err := cmd.Flags().GetString("title"); err != nil {
 			return errors.Wrap(err, "failed to get title flag")
-		} else if v = strings.TrimSpace(v); len(v) < 3 {
-			return errors.Wrap(err, "title may not be empty")
 		} else {
 			params.Title = v
 		}
@@ -120,7 +117,41 @@ var editCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("not implemented")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		ws, err := s.OpenWorkspace(cmd.Context(), w, true)
+		if err != nil {
+			return err
+		}
+		defer ws.Close()
+
+		params := au.EditTodoParams{}
+		if v, err := cmd.Flags().GetString("title"); err != nil {
+			return errors.Wrap(err, "failed to get title flag")
+		} else if v != "" {
+			params.Title = &v
+		}
+		if v, err := cmd.Flags().GetString("description"); err != nil {
+			return errors.Wrap(err, "failed to get description flag")
+		} else if v != "" {
+			params.Description = &v
+		}
+		if v, err := cmd.Flags().GetString("status"); err != nil {
+			return errors.Wrap(err, "failed to get status flag")
+		} else if v != "" {
+			params.Status = &v
+		}
+
+		if todo, err := ws.EditTodo(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
+			return err
+		} else {
+			encoder := yaml.NewEncoder(os.Stdout)
+			encoder.SetIndent(2)
+			return encoder.Encode(todo)
+		}
 	},
 }
 
@@ -129,7 +160,21 @@ var deleteCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("not implemented")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		ws, err := s.OpenWorkspace(cmd.Context(), w, true)
+		if err != nil {
+			return err
+		}
+		defer ws.Close()
+
+		if err := ws.DeleteTodo(cmd.Context(), cmd.Flags().Arg(0)); err != nil {
+			return err
+		}
+		return nil
 	},
 }
 
@@ -137,6 +182,10 @@ func init() {
 	createCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	_ = createCommand.MarkFlagRequired("title")
 	createCommand.Flags().String("description", "", "Set the description of the Todo")
+
+	editCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
+	editCommand.Flags().String("description", "", "Set the description of the Todo")
+	editCommand.Flags().String("status", "", "Set the status of the Todo")
 
 	Command.AddCommand(
 		getCommand,

@@ -98,8 +98,56 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	return &Todo{Id: todoId, CreatedAt: createdAt, Status: params.Status, Title: params.Title, Description: params.Description}, nil
 }
 
-func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, edit *Todo) (*Todo, error) {
-	return nil, errors.New("not implemented")
+func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error) {
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	td, err := getTodoInner(todos, id)
+	if err != nil {
+		return nil, err
+	}
+	todoValue, _ := p.Doc.Path("todos").Map().Get(id)
+	if params.Title != nil {
+		if err := todoValue.Map().Set("title", *params.Title); err != nil {
+			return nil, errors.Wrap(err, "failed to set title on existing todo")
+		}
+		td.Title = *params.Title
+	}
+	if params.Description != nil {
+		if err := todoValue.Map().Set("description", *params.Description); err != nil {
+			return nil, errors.Wrap(err, "failed to set description on existing todo")
+		}
+		td.Description = *params.Description
+	}
+	if params.Status != nil {
+		if err := todoValue.Map().Set("status", *params.Status); err != nil {
+			return nil, errors.Wrap(err, "failed to set status on existing todo")
+		}
+		td.Status = *params.Status
+	}
+	if _, err := p.Doc.Commit("edited todo " + id); err != nil {
+		return nil, errors.Wrap(err, "failed to commit")
+	}
+	return td, nil
+}
+
+func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) error {
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	_, err := getTodoInner(todos, id)
+	if err != nil {
+		return err
+	}
+	if err := todos.Delete(id); err != nil {
+		return err
+	}
+	if _, err := p.Doc.Commit("deleted todo " + id); err != nil {
+		return errors.Wrap(err, "failed to commit")
+	}
+	return nil
 }
 
 func (p *inMemoryWorkspaceProvider) Flush() error {

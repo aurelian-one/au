@@ -38,7 +38,8 @@ type WorkspaceProvider interface {
 	ListTodos(ctx context.Context) ([]Todo, error)
 	GetTodo(ctx context.Context, id string) (*Todo, error)
 	CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error)
-	EditTodo(ctx context.Context, id string, edit *Todo) (*Todo, error)
+	EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error)
+	DeleteTodo(ctx context.Context, id string) error
 	Flush() error
 	Close() error
 }
@@ -56,4 +57,10 @@ type CreateTodoParams struct {
 	Title       string
 	Description string
 	Status      string
+}
+
+type EditTodoParams struct {
+	Title       *string
+	Description *string
+	Status      *string
 }

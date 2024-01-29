@@ -202,6 +202,8 @@ type directoryStorageWorkspace struct {
 	Doc      *inMemoryWorkspaceProvider
 }
 
+var _ WorkspaceProvider = (*directoryStorageWorkspace)(nil)
+
 func (d *directoryStorageWorkspace) Flush() error {
 	if d.Unlocker == nil {
 		return errors.New("workspace is not locked for writing")
@@ -234,9 +236,31 @@ func (d *directoryStorageWorkspace) GetTodo(ctx context.Context, id string) (*To
 }
 
 func (d *directoryStorageWorkspace) CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error) {
-	return d.Doc.CreateTodo(ctx, params)
+	if t, err := d.Doc.CreateTodo(ctx, params); err != nil {
+		return nil, err
+	} else if err = d.Flush(); err != nil {
+		return nil, err
+	} else {
+		return t, nil
+	}
 }
 
-func (d *directoryStorageWorkspace) EditTodo(ctx context.Context, id string, edit *Todo) (*Todo, error) {
-	return d.Doc.EditTodo(ctx, id, edit)
+func (d *directoryStorageWorkspace) EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error) {
+	if t, err := d.Doc.EditTodo(ctx, id, params); err != nil {
+		return nil, err
+	} else if err = d.Flush(); err != nil {
+		return nil, err
+	} else {
+		return t, nil
+	}
+}
+
+func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string) error {
+	if err := d.Doc.DeleteTodo(ctx, id); err != nil {
+		return err
+	} else if err = d.Flush(); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
