@@ -115,6 +115,7 @@ var syncServerCommand = &cobra.Command{
 			uid := mux.Vars(request)["uid"]
 			ws, err := s.OpenWorkspace(cmd.Context(), uid, true)
 			if err != nil {
+				slog.Error(err.Error())
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -123,6 +124,7 @@ var syncServerCommand = &cobra.Command{
 
 			dws, ok := ws.(au.DocProvider)
 			if !ok {
+				slog.Error("not a doc provider")
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -136,7 +138,7 @@ var syncServerCommand = &cobra.Command{
 				return
 			}
 			defer conn.Close()
-			if err := auws.Sync(request.Context(), slog.Default(), conn, dws.Doc(), false); err != nil {
+			if err := auws.Sync(request.Context(), slog.Default(), conn, dws.GetDoc(), false); err != nil {
 				slog.Error("failed to sync", "err", err)
 				_ = conn.Close()
 			}
@@ -146,6 +148,7 @@ var syncServerCommand = &cobra.Command{
 
 			ws, err := s.OpenWorkspace(cmd.Context(), uid, false)
 			if err != nil {
+				slog.Error(err.Error())
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -153,10 +156,11 @@ var syncServerCommand = &cobra.Command{
 
 			dws, ok := ws.(au.DocProvider)
 			if !ok {
+				slog.Error("not a doc provider")
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			_, _ = writer.Write(dws.Doc().Save())
+			_, _ = writer.Write(dws.GetDoc().Save())
 		})).Methods(http.MethodGet)
 		server := http.Server{Handler: m}
 		go func() {
@@ -209,7 +213,7 @@ var syncClientCommand = &cobra.Command{
 		}
 		defer conn.Close()
 
-		if err := auws.Sync(cmd.Context(), slog.Default(), conn, dws.Doc(), true); err != nil {
+		if err := auws.Sync(cmd.Context(), slog.Default(), conn, dws.GetDoc(), true); err != nil {
 			return fmt.Errorf("failed to sync: %w", err)
 		}
 		if err := ws.Flush(); err != nil {
@@ -247,13 +251,13 @@ var syncImportCommand = &cobra.Command{
 			return fmt.Errorf("failed to request: %w", err)
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return errors.New("non-200 response code from get api")
-		}
-
 		buffer, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return errors.New("failed to read body")
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return errors.Errorf("non-200 response code from get api: %d %s", resp.StatusCode, string(buffer))
 		}
 
 		if metadata, err := s.ImportWorkspace(cmd.Context(), cmd.Flags().Arg(1), buffer); err != nil {

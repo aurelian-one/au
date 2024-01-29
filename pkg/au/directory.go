@@ -239,6 +239,7 @@ type directoryStorageWorkspace struct {
 }
 
 var _ WorkspaceProvider = (*directoryStorageWorkspace)(nil)
+var _ DocProvider = (*directoryStorageWorkspace)(nil)
 
 func (d *directoryStorageWorkspace) Flush() error {
 	if d.Unlocker == nil {
@@ -281,4 +282,8 @@ func (d *directoryStorageWorkspace) EditTodo(ctx context.Context, id string, par
 
 func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string) error {
 	return d.Doc.DeleteTodo(ctx, id)
+}
+
+func (d *directoryStorageWorkspace) GetDoc() *automerge.Doc {
+	return d.Doc.Doc
 }

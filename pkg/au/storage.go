@@ -21,7 +21,7 @@ type StorageProvider interface {
 }
 
 type DocProvider interface {
-	Doc() *automerge.Doc
+	GetDoc() *automerge.Doc
 }
 
 type WorkspaceMeta struct {

@@ -39,7 +39,7 @@ var dumpCommand = &cobra.Command{
 		if !ok {
 			return errors.New("no access to doc")
 		}
-		doc := dws.Doc()
+		doc := dws.GetDoc()
 
 		encoder := yaml.NewEncoder(os.Stdout)
 		encoder.SetIndent(2)
@@ -66,7 +66,7 @@ var historyCommand = &cobra.Command{
 		if !ok {
 			return errors.New("no access to doc")
 		}
-		doc := dws.Doc()
+		doc := dws.GetDoc()
 
 		output := make([]map[string]interface{}, 0)
 		changes, err := doc.Changes()
@@ -110,7 +110,7 @@ var generateDotCommand = &cobra.Command{
 		if !ok {
 			return errors.New("no access to doc")
 		}
-		doc := dws.Doc()
+		doc := dws.GetDoc()
 
 		_, _ = fmt.Fprintln(os.Stdout, "strict digraph {")
 		_, _ = fmt.Fprintf(os.Stdout, "node [colorscheme=pastel19]")

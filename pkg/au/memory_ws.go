@@ -158,4 +158,9 @@ func (p *inMemoryWorkspaceProvider) Close() error {
 	return nil
 }
 
+func (p *inMemoryWorkspaceProvider) GetDoc() *automerge.Doc {
+	return p.Doc
+}
+
 var _ WorkspaceProvider = (*inMemoryWorkspaceProvider)(nil)
+var _ DocProvider = (*inMemoryWorkspaceProvider)(nil)
