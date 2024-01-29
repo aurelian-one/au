@@ -1,10 +1,8 @@
 package workspacecmd
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -21,15 +19,8 @@ var initCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"alias"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if err := c.Init(); err != nil {
-			return errors.Wrap(err, "failed to init directory")
-		}
-		uid, err := c.CreateNewWorkspace(args[0])
-		if err != nil {
-			return err
-		}
-		metadata, err := c.GetWorkspaceMetadata(uid)
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		metadata, err := s.CreateWorkspace(cmd.Context(), au.CreateWorkspaceParams{Alias: cmd.Flags().Arg(0)})
 		if err != nil {
 			return err
 		}
@@ -43,22 +34,14 @@ var listCommand = &cobra.Command{
 	Use:  "list",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		workspaceUids, err := c.ListWorkspaceUids()
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		metadataList, err := s.ListWorkspaces(cmd.Context())
 		if err != nil {
-			return errors.Wrap(err, "failed to list workspaces")
-		}
-		output := make([]*au.WorkspaceMetadata, 0, len(workspaceUids))
-		for _, uid := range workspaceUids {
-			metadata, err := c.GetWorkspaceMetadata(uid)
-			if err != nil {
-				return errors.Wrap(err, "failed to read metadata")
-			}
-			output = append(output, metadata)
+			return err
 		}
 		encoder := yaml.NewEncoder(os.Stdout)
 		encoder.SetIndent(2)
-		return encoder.Encode(output)
+		return encoder.Encode(metadataList)
 	},
 }
 
@@ -67,22 +50,17 @@ var useCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if exists, err := c.DoesWorkspaceExist(args[0]); err != nil {
-			return errors.Wrap(err, "failed to check for workspace")
-		} else if !exists {
-			return errors.New("workspace does not exist")
-		}
-		if err := c.ChangeCurrentWorkspaceUid(args[0]); err != nil {
-			return errors.Wrap(err, "failed to change current workspace")
-		}
-		metadata, err := c.GetWorkspaceMetadata(args[0])
-		if err != nil {
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		if metadata, err := s.GetWorkspace(cmd.Context(), cmd.Flags().Arg(0)); err != nil {
 			return err
+		} else {
+			if err := s.SetCurrentWorkspace(cmd.Context(), cmd.Flags().Arg(0)); err != nil {
+				return err
+			}
+			encoder := yaml.NewEncoder(os.Stdout)
+			encoder.SetIndent(2)
+			return encoder.Encode(metadata)
 		}
-		encoder := yaml.NewEncoder(os.Stdout)
-		encoder.SetIndent(2)
-		return encoder.Encode(metadata)
 	},
 }
 
@@ -91,20 +69,22 @@ var deleteCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if exists, err := c.DoesWorkspaceExist(args[0]); err != nil {
-			return errors.Wrap(err, "failed to check for workspace")
-		} else if !exists {
-			return errors.New("workspace does not exist")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		if _, err := s.GetWorkspace(cmd.Context(), cmd.Flags().Arg(0)); err != nil {
+			return err
+		} else {
+			if id, err := s.GetCurrentWorkspace(cmd.Context()); err != nil {
+				return err
+			} else if id == cmd.Flags().Arg(0) {
+				if err := s.SetCurrentWorkspace(cmd.Context(), ""); err != nil {
+					return err
+				}
+			}
+			if err := s.DeleteWorkspace(cmd.Context(), cmd.Flags().Arg(0)); err != nil {
+				return err
+			}
 		}
-		confirmed, err := au.Confirm(fmt.Sprintf("Are you sure you want to delete workspace %s in directory %s?", args[0], c.Path), os.Stdout, os.Stdin)
-		if err != nil {
-			return errors.Wrap(err, "failed to confirm")
-		}
-		if !confirmed {
-			return &common.ExitWithCode{Code: 1}
-		}
-		return errors.Wrap(c.DeleteWorkspace(args[0]), "failed to delete workspace")
+		return nil
 	},
 }
 
@@ -113,8 +93,9 @@ var syncServerCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"address"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		return c.ListenAndServe(cmd.Context(), cmd.Flags().Arg(0))
+		return nil
+		//c := cmd.Context().Value(common.StorageContextKey).(*au.ConfigDirectory)
+		//return c.ListenAndServe(cmd.Context(), cmd.Flags().Arg(0))
 	},
 }
 
@@ -123,11 +104,12 @@ var syncClientCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"address"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if c.CurrentUid == "" {
-			return errors.New("no current workspace set")
-		}
-		return c.ConnectAndSync(cmd.Context(), c.CurrentUid, cmd.Flags().Arg(0))
+		return nil
+		//c := cmd.Context().Value(common.StorageContextKey).(*au.ConfigDirectory)
+		//if c.CurrentUid == "" {
+		//	return errors.New("no current workspace set")
+		//}
+		//return c.ConnectAndSync(cmd.Context(), c.CurrentUid, cmd.Flags().Arg(0))
 	},
 }
 
@@ -136,8 +118,9 @@ var syncImportCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"address", "uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		return c.ConnectAndImport(cmd.Context(), args[1], args[0])
+		return nil
+		//c := cmd.Context().Value(common.StorageContextKey).(*au.ConfigDirectory)
+		//return c.ConnectAndImport(cmd.Context(), args[1], args[0])
 	},
 }
 

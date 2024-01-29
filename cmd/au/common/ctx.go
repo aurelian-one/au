@@ -2,4 +2,5 @@ package common
 
 type contextKey int
 
-const ConfigDirectoryContextKey = contextKey(0)
+const StorageContextKey = contextKey(0)
+const CurrentWorkspaceIdContextKey = contextKey(1)

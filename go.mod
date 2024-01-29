@@ -4,7 +4,6 @@ go 1.21
 
 require (
 	github.com/automerge/automerge-go v0.0.0-20230903201930-b80ce8aadbb9
-	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-isatty v0.0.20
 	github.com/oklog/ulid/v2 v2.1.0

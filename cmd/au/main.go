@@ -106,18 +106,27 @@ func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string
 	if err != nil {
 		return err
 	}
+	directoryStorage, err := au.NewDirectoryStorage(directoryValue)
+	if err != nil {
+		return err
+	}
 	workspaceValue, err := cmd.Flags().GetString(workspaceFlag)
 	if err != nil {
 		return err
 	}
-	workspaceValue, err = au.ResolveWorkspaceUid(directoryValue, workspaceValue)
+	workspaceValue, err = au.ResolveWorkspaceUid(workspaceValue)
 	if err != nil {
 		return err
 	}
-	cmd.SetContext(context.WithValue(cmd.Context(), common.ConfigDirectoryContextKey, &au.ConfigDirectory{
-		Path:       directoryValue,
-		CurrentUid: workspaceValue,
-	}))
+	if workspaceValue == "" {
+		if r, err := directoryStorage.GetCurrentWorkspace(cmd.Context()); err != nil {
+			return err
+		} else {
+			workspaceValue = r
+		}
+	}
+	cmd.SetContext(context.WithValue(cmd.Context(), common.StorageContextKey, directoryStorage))
+	cmd.SetContext(context.WithValue(cmd.Context(), common.CurrentWorkspaceIdContextKey, workspaceValue))
 	return nil
 }
 

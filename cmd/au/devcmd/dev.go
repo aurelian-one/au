@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/automerge/automerge-go"
@@ -25,18 +24,23 @@ var dumpCommand = &cobra.Command{
 	Use:  "export-workspace",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if c.CurrentUid == "" {
-			return errors.New("no current workspace set")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
 		}
-		raw, err := os.ReadFile(filepath.Join(c.Path, c.CurrentUid+".automerge"))
+		ws, err := s.OpenWorkspace(cmd.Context(), w, false)
 		if err != nil {
-			return errors.Wrap(err, "failed to read workspace file")
+			return err
 		}
-		doc, err := automerge.Load(raw)
-		if err != nil {
-			return errors.Wrap(err, "failed to preview workspace file")
+		defer ws.Close()
+
+		dws, ok := ws.(au.DocProvider)
+		if !ok {
+			return errors.New("no access to doc")
 		}
+		doc := dws.Doc()
+
 		encoder := yaml.NewEncoder(os.Stdout)
 		encoder.SetIndent(2)
 		return encoder.Encode(toTree(doc.Root()))
@@ -47,18 +51,23 @@ var historyCommand = &cobra.Command{
 	Use:  "show-workspace-history",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if c.CurrentUid == "" {
-			return errors.New("no current workspace set")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
 		}
-		raw, err := os.ReadFile(filepath.Join(c.Path, c.CurrentUid+".automerge"))
+		ws, err := s.OpenWorkspace(cmd.Context(), w, false)
 		if err != nil {
-			return errors.Wrap(err, "failed to read workspace file")
+			return err
 		}
-		doc, err := automerge.Load(raw)
-		if err != nil {
-			return errors.Wrap(err, "failed to preview workspace file")
+		defer ws.Close()
+
+		dws, ok := ws.(au.DocProvider)
+		if !ok {
+			return errors.New("no access to doc")
 		}
+		doc := dws.Doc()
+
 		output := make([]map[string]interface{}, 0)
 		changes, err := doc.Changes()
 		if err != nil {
@@ -86,18 +95,22 @@ var generateDotCommand = &cobra.Command{
 	Use:  "generate-dot",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c := cmd.Context().Value(common.ConfigDirectoryContextKey).(*au.ConfigDirectory)
-		if c.CurrentUid == "" {
-			return errors.New("no current workspace set")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
 		}
-		raw, err := os.ReadFile(filepath.Join(c.Path, c.CurrentUid+".automerge"))
+		ws, err := s.OpenWorkspace(cmd.Context(), w, false)
 		if err != nil {
-			return errors.Wrap(err, "failed to read workspace file")
+			return err
 		}
-		doc, err := automerge.Load(raw)
-		if err != nil {
-			return errors.Wrap(err, "failed to preview workspace file")
+		defer ws.Close()
+
+		dws, ok := ws.(au.DocProvider)
+		if !ok {
+			return errors.New("no access to doc")
 		}
+		doc := dws.Doc()
 
 		_, _ = fmt.Fprintln(os.Stdout, "strict digraph {")
 		_, _ = fmt.Fprintf(os.Stdout, "node [colorscheme=pastel19]")
