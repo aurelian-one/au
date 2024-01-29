@@ -105,6 +105,10 @@ var syncServerCommand = &cobra.Command{
 
 		m := mux.NewRouter()
 		m.Handle("/workspaces/{uid}/actions/sync", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+
+			// TODO: this works but doesn't provide concurrency. ideally we should open the workspace in memory in some
+			// 	kind of cache so that concurrent requests can consume it.
+
 			uid := mux.Vars(request)["uid"]
 			ws, err := s.OpenWorkspace(cmd.Context(), uid, true)
 			if err != nil {
@@ -187,7 +191,7 @@ var syncClientCommand = &cobra.Command{
 		baseUrl.Scheme = "ws"
 		baseUrl.RawQuery = ""
 		baseUrl.RawFragment = ""
-		baseUrl = baseUrl.JoinPath("workspaces", uid, "actions", "sync")
+		baseUrl = baseUrl.JoinPath("workspaces", w, "actions", "sync")
 		conn, _, err := websocket.DefaultDialer.Dial(baseUrl.String(), nil)
 		if err != nil {
 			return fmt.Errorf("failed to dial: %w", err)
