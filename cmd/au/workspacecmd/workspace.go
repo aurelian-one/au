@@ -1,12 +1,15 @@
 package workspacecmd
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -162,12 +165,42 @@ var syncClientCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"address"},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		ws, err := s.OpenWorkspace(cmd.Context(), w, true)
+		if err != nil {
+			return err
+		}
+		defer ws.Close()
+		dws, ok := ws.(au.DocProvider)
+		if !ok {
+			return errors.New("no doc available")
+		}
+
+		baseUrl, err := url.Parse(cmd.Flags().Arg(0))
+		if err != nil {
+			return errors.Wrap(err, "invalid url")
+		}
+		baseUrl.Scheme = "ws"
+		baseUrl.RawQuery = ""
+		baseUrl.RawFragment = ""
+		baseUrl = baseUrl.JoinPath("workspaces", uid, "actions", "sync")
+		conn, _, err := websocket.DefaultDialer.Dial(baseUrl.String(), nil)
+		if err != nil {
+			return fmt.Errorf("failed to dial: %w", err)
+		}
+		defer conn.Close()
+
+		if err := auws.Sync(cmd.Context(), slog.Default(), conn, dws.Doc(), true); err != nil {
+			return fmt.Errorf("failed to sync: %w", err)
+		}
+		if err := ws.Flush(); err != nil {
+			return errors.Wrap(err, "failed to write destination file")
+		}
 		return nil
-		//c := cmd.Context().Value(common.StorageContextKey).(*au.ConfigDirectory)
-		//if c.CurrentUid == "" {
-		//	return errors.New("no current workspace set")
-		//}
-		//return c.ConnectAndSync(cmd.Context(), c.CurrentUid, cmd.Flags().Arg(0))
 	},
 }
 
@@ -176,9 +209,7 @@ var syncImportCommand = &cobra.Command{
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"address", "uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return nil
-		//c := cmd.Context().Value(common.StorageContextKey).(*au.ConfigDirectory)
-		//return c.ConnectAndImport(cmd.Context(), args[1], args[0])
+		return errors.New("not implemented")
 	},
 }
 
