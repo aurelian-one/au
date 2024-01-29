@@ -2,10 +2,13 @@ package workspacecmd
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sync/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -155,12 +158,20 @@ var syncServerCommand = &cobra.Command{
 			}
 			_, _ = writer.Write(dws.Doc().Save())
 		})).Methods(http.MethodGet)
-		server := http.Server{Addr: cmd.Flags().Arg(0), Handler: m}
+		server := http.Server{Handler: m}
 		go func() {
 			<-cmd.Context().Done()
 			_ = server.Close()
 		}()
-		return server.ListenAndServe()
+		listener, err := net.Listen("tcp", cmd.Flags().Arg(0))
+		if err != nil {
+			return errors.Wrap(err, "failed to listen")
+		}
+		listenRef, ok := cmd.Context().Value(common.ListenerRefContextKey).(*atomic.Value)
+		if ok {
+			listenRef.Store(listener)
+		}
+		return server.Serve(listener)
 	},
 }
 
@@ -211,9 +222,47 @@ var syncClientCommand = &cobra.Command{
 var syncImportCommand = &cobra.Command{
 	Use:        "sync-import <http://localhost:80>",
 	Args:       cobra.ExactArgs(2),
-	ArgAliases: []string{"address", "uid"},
+	ArgAliases: []string{"address", "id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("not implemented")
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+
+		if _, err := s.GetWorkspace(cmd.Context(), cmd.Flags().Arg(1)); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		} else {
+			return errors.New("workspace already exists - did you mean to sync instead?")
+		}
+
+		baseUrl, err := url.Parse(cmd.Flags().Arg(0))
+		if err != nil {
+			return errors.Wrap(err, "invalid url")
+		}
+		baseUrl.RawQuery = ""
+		baseUrl.RawFragment = ""
+		baseUrl = baseUrl.JoinPath("workspaces", cmd.Flags().Arg(1), "raw")
+
+		resp, err := http.DefaultClient.Get(baseUrl.String())
+		if err != nil {
+			return fmt.Errorf("failed to request: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return errors.New("non-200 response code from get api")
+		}
+
+		buffer, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return errors.New("failed to read body")
+		}
+
+		if metadata, err := s.ImportWorkspace(cmd.Context(), cmd.Flags().Arg(1), buffer); err != nil {
+			return err
+		} else {
+			encoder := yaml.NewEncoder(os.Stdout)
+			encoder.SetIndent(2)
+			return encoder.Encode(metadata)
+		}
 	},
 }
 

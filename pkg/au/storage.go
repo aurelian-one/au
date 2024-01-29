@@ -12,6 +12,7 @@ type StorageProvider interface {
 	GetWorkspace(ctx context.Context, id string) (*WorkspaceMeta, error)
 	CreateWorkspace(ctx context.Context, params CreateWorkspaceParams) (*WorkspaceMeta, error)
 	DeleteWorkspace(ctx context.Context, id string) error
+	ImportWorkspace(ctx context.Context, id string, data []byte) (*WorkspaceMeta, error)
 
 	GetCurrentWorkspace(ctx context.Context) (string, error)
 	SetCurrentWorkspace(ctx context.Context, id string) error

@@ -192,6 +192,42 @@ func (d *directoryStorage) OpenWorkspace(ctx context.Context, id string, writeab
 	return provider, nil
 }
 
+func (d *directoryStorage) ImportWorkspace(ctx context.Context, id string, data []byte) (*WorkspaceMeta, error) {
+	if _, err := ulid.Parse(id); err != nil {
+		return nil, errors.New("invalid workspace id - expected a valid ulid")
+	}
+	doc, err := automerge.Load(data)
+	if err != nil {
+		return nil, errors.New("data is not an automerge document")
+	}
+
+	meta := WorkspaceMeta{Id: id, SizeBytes: int64(len(data))}
+	if aliasValue, err := doc.Path("alias").Get(); err != nil {
+		meta.Alias = "<no alias set>"
+	} else {
+		meta.Alias = aliasValue.Str()
+	}
+	if createdAtValue, err := doc.Path("created_at").Get(); err == nil {
+		meta.CreatedAt = createdAtValue.Time()
+	}
+	if todosValue, err := doc.Path("todos").Get(); err != nil {
+		return nil, errors.Wrap(err, "unable to read todos value in imported document")
+	} else if todosValue.Kind() != automerge.KindMap {
+		return nil, errors.Wrap(err, "todos structure is not a map")
+	}
+
+	path := filepath.Join(d.Path, id+Suffix)
+	tempPath := path + ".temp"
+	if err := os.WriteFile(tempPath, doc.Save(), os.FileMode(0644)); err != nil {
+		return nil, errors.Wrap(err, "failed to write workspace file")
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return nil, errors.Wrap(err, "failed to move workspace file to target")
+	}
+
+	return &meta, nil
+}
+
 var _ StorageProvider = (*directoryStorage)(nil)
 
 type directoryStorageWorkspace struct {
