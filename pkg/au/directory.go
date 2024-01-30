@@ -86,7 +86,7 @@ func (d *directoryStorage) CreateWorkspace(ctx context.Context, params CreateWor
 
 	doc := automerge.New()
 	_ = doc.Path("alias").Set(params.Alias)
-	createdAt := time.Now().UTC().Round(time.Second).Local()
+	createdAt := time.Now().UTC().Truncate(time.Second).Local()
 	_ = doc.Path("created_at").Set(createdAt)
 	_ = doc.Path("todos").Set(automerge.NewMap())
 
@@ -277,5 +277,5 @@ func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string) e
 }
 
 func (d *directoryStorageWorkspace) GetDoc() *automerge.Doc {
-	return d.Doc.Doc
+	return d.Doc.GetDoc()
 }

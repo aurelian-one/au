@@ -35,24 +35,26 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	item, err := todos.Get(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get todo")
+	} else if item.Kind() != automerge.KindMap {
+		return nil, errors.Errorf("todo with id '%s' does not exist", id)
 	}
 	output := new(Todo)
 	output.Id = id
-	if titleValue, _ := item.Map().Get("title"); titleValue != nil {
+	if titleValue, _ := item.Map().Get("title"); titleValue.Kind() == automerge.KindStr {
 		output.Title = titleValue.Str()
 	}
-	if statusValue, _ := item.Map().Get("status"); statusValue != nil {
+	if statusValue, _ := item.Map().Get("status"); statusValue.Kind() == automerge.KindStr {
 		output.Status = statusValue.Str()
 	}
-	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue != nil {
-		output.CreatedAt = createdAtValue.Time()
+	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
+		output.CreatedAt = createdAtValue.Time().In(time.UTC)
 	}
-	if descriptionValue, _ := item.Map().Get("description"); descriptionValue != nil {
-		if asText, _ := descriptionValue.Text().Get(); err == nil {
-			output.Description = asText
-		} else {
-			output.Description = descriptionValue.Str()
-		}
+	descriptionValue, _ := item.Map().Get("description")
+	switch descriptionValue.Kind() {
+	case automerge.KindStr:
+		output.Description = descriptionValue.Str()
+	case automerge.KindText:
+		output.Description, _ = descriptionValue.Text().Get()
 	}
 	return output, nil
 }
@@ -80,7 +82,7 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 		return nil, errors.Wrap(err, "failed to set todo entry")
 	}
 
-	createdAt := time.Now()
+	createdAt := time.Now().UTC().Truncate(time.Second)
 	if err := newTodo.Set("status", params.Status); err != nil {
 		return nil, errors.Wrap(err, "failed to set status")
 	} else if err := newTodo.Set("created_at", createdAt); err != nil {
@@ -92,7 +94,7 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	if err := newTodo.Set("description", automerge.NewText(params.Description)); err != nil {
 		return nil, errors.Wrap(err, "failed to set description")
 	}
-	if _, err := p.Doc.Commit("added todo " + todoId); err != nil {
+	if _, err := p.Doc.Commit("created todo " + todoId); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return &Todo{Id: todoId, CreatedAt: createdAt, Status: params.Status, Title: params.Title, Description: params.Description}, nil
