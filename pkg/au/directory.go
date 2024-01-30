@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/automerge/automerge-go"
+	"github.com/gofrs/flock"
 	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
-
-	"github.com/aurelian-one/au/internal/lockedfile"
 )
 
 const Suffix = ".automerge"
@@ -86,16 +85,10 @@ func (d *directoryStorage) CreateWorkspace(ctx context.Context, params CreateWor
 	}
 
 	doc := automerge.New()
-	if err := doc.Path("alias").Set(params.Alias); err != nil {
-		return nil, errors.Wrap(err, "failed to set alias in new workspace")
-	}
-	createdAt := time.Now()
-	if err := doc.Path("created_at").Set(createdAt); err != nil {
-		return nil, errors.Wrap(err, "failed to set created_at time in new workspace")
-	}
-	if err := doc.Path("todos").Set(automerge.NewMap()); err != nil {
-		return nil, errors.Wrap(err, "failed to set todos map")
-	}
+	_ = doc.Path("alias").Set(params.Alias)
+	createdAt := time.Now().UTC().Round(time.Second).Local()
+	_ = doc.Path("created_at").Set(createdAt)
+	_ = doc.Path("todos").Set(automerge.NewMap())
 
 	content := doc.Save()
 	path := filepath.Join(d.Path, chosenId+Suffix)
@@ -117,7 +110,7 @@ func (d *directoryStorage) CreateWorkspace(ctx context.Context, params CreateWor
 
 func (d *directoryStorage) DeleteWorkspace(ctx context.Context, id string) error {
 	if err := os.Remove(filepath.Join(d.Path, id+Suffix)); err != nil {
-		return errors.Wrapf(err, "failed to delete workspace file")
+		return errors.Wrapf(err, "failed to delete workspace")
 	}
 	return nil
 }
@@ -151,13 +144,15 @@ func (d *directoryStorage) OpenWorkspace(ctx context.Context, id string, writeab
 
 	var unlocker func()
 	if writeable {
-		lockPath := path + ".lock"
-		locker := lockedfile.MutexAt(lockPath)
-		unlockerFunc, err := locker.Lock()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to open workspace for writing")
+		locker := flock.New(path + ".lock")
+		if locked, err := locker.TryLock(); err != nil {
+			return nil, errors.Wrap(err, "failed to lock the workspace for writing")
+		} else if !locked {
+			return nil, errors.New("failed to lock the workspace for editing: it is already locked by another process")
 		}
-		unlocker = unlockerFunc
+		unlocker = func() {
+			_ = locker.Unlock()
+		}
 	}
 	defer func() {
 		if unlocker != nil {
@@ -175,15 +170,12 @@ func (d *directoryStorage) OpenWorkspace(ctx context.Context, id string, writeab
 	}
 
 	meta := WorkspaceMeta{Id: id, SizeBytes: int64(len(raw))}
-	if aliasValue, err := doc.Path("alias").Get(); err != nil {
-		meta.Alias = "<no alias set>"
-	} else {
+	if aliasValue, _ := doc.Path("alias").Get(); aliasValue.Kind() == automerge.KindStr {
 		meta.Alias = aliasValue.Str()
 	}
-	if createdAtValue, err := doc.Path("created_at").Get(); err == nil {
+	if createdAtValue, _ := doc.Path("created_at").Get(); createdAtValue.Kind() == automerge.KindTime {
 		meta.CreatedAt = createdAtValue.Time()
 	}
-
 	provider := &directoryStorageWorkspace{
 		Path: path, Unlocker: unlocker, Logger: d.Logger.With("ws", id),
 		Metadata: meta, Doc: &inMemoryWorkspaceProvider{Doc: doc},
@@ -202,18 +194,18 @@ func (d *directoryStorage) ImportWorkspace(ctx context.Context, id string, data 
 	}
 
 	meta := WorkspaceMeta{Id: id, SizeBytes: int64(len(data))}
-	if aliasValue, err := doc.Path("alias").Get(); err != nil {
-		meta.Alias = "<no alias set>"
+	if aliasValue, _ := doc.Path("alias").Get(); aliasValue.Kind() != automerge.KindStr {
+		return nil, errors.Errorf("automerge document 'alias' is %s, expected %s", aliasValue.Kind(), automerge.KindStr)
 	} else {
 		meta.Alias = aliasValue.Str()
 	}
-	if createdAtValue, err := doc.Path("created_at").Get(); err == nil {
+	if createdAtValue, _ := doc.Path("created_at").Get(); createdAtValue.Kind() != automerge.KindTime {
+		return nil, errors.Errorf("automerge document 'created_at' is %s, expected %s", createdAtValue.Kind(), automerge.KindTime)
+	} else {
 		meta.CreatedAt = createdAtValue.Time()
 	}
-	if todosValue, err := doc.Path("todos").Get(); err != nil {
-		return nil, errors.Wrap(err, "unable to read todos value in imported document")
-	} else if todosValue.Kind() != automerge.KindMap {
-		return nil, errors.Wrap(err, "todos structure is not a map")
+	if todosValue, _ := doc.Path("todos").Get(); todosValue.Kind() != automerge.KindMap {
+		return nil, errors.Errorf("automerge document 'todos' is %s, expected %s", todosValue.Kind(), automerge.KindMap)
 	}
 
 	path := filepath.Join(d.Path, id+Suffix)
