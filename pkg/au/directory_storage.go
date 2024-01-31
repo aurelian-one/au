@@ -15,6 +15,8 @@ import (
 )
 
 const Suffix = ".automerge"
+const MinimumAliasLength = 3
+const MaximumAliasLength = 100
 
 type directoryStorage struct {
 	Path   string
@@ -69,6 +71,12 @@ func (d *directoryStorage) GetWorkspace(ctx context.Context, id string) (*Worksp
 }
 
 func (d *directoryStorage) CreateWorkspace(ctx context.Context, params CreateWorkspaceParams) (*WorkspaceMeta, error) {
+	var err error
+	params.Alias, err = ValidateWorkspaceAlias(params.Alias)
+	if err != nil {
+		return nil, err
+	}
+
 	var chosenId string
 	for i := 0; i < 20; i++ {
 		proposedId := ulid.Make().String()

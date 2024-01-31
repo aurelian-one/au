@@ -33,7 +33,9 @@ func TestCreateTodo_success(t *testing.T) {
 	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
 		Title:       "Do the thing",
 		Description: "Much longer text about doing the thing",
-		Status:      "open",
+		Annotations: map[string]string{
+			"https://aurelian-one/spec#some-annotation": "something",
+		},
 	})
 	assert.NoError(t, err)
 	_, err = ulid.Parse(td.Id)
@@ -42,6 +44,9 @@ func TestCreateTodo_success(t *testing.T) {
 	assert.Equal(t, "Do the thing", td.Title)
 	assert.Equal(t, "Much longer text about doing the thing", td.Description)
 	assert.Equal(t, "open", td.Status)
+	assert.Equal(t, map[string]string{
+		"https://aurelian-one/spec#some-annotation": "something",
+	}, td.Annotations)
 	if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 		c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
 		assert.Equal(t, "created todo "+td.Id, c.Message())
@@ -59,7 +64,6 @@ func TestEditTodo_success(t *testing.T) {
 	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
 		Title:       "Do the thing",
 		Description: "Much longer text about doing the thing",
-		Status:      "open",
 	})
 	assert.NoError(t, err)
 	newTitle, newDescription, newStatus := "Do the other thing", "Short description", "closed"
@@ -98,7 +102,6 @@ func TestDeleteTodo_success(t *testing.T) {
 	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
 		Title:       "Do the thing",
 		Description: "Much longer text about doing the thing",
-		Status:      "open",
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, wsp.DeleteTodo(context.Background(), td.Id))

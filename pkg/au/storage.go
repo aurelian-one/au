@@ -52,16 +52,19 @@ type Todo struct {
 	Title       string
 	Description string
 	Status      string
+	Annotations map[string]string
 }
 
 type CreateTodoParams struct {
 	Title       string
 	Description string
-	Status      string
+	Status      *string
+	Annotations map[string]string
 }
 
 type EditTodoParams struct {
 	Title       *string
 	Description *string
 	Status      *string
+	Annotations map[string]string
 }
