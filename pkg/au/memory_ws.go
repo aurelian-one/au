@@ -2,6 +2,7 @@ package au
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +57,17 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	case automerge.KindText:
 		output.Description, _ = descriptionValue.Text().Get()
 	}
+
+	output.Annotations = make(map[string]string)
+	if annotationsValue, _ := item.Map().Get("annotations"); annotationsValue.Kind() == automerge.KindMap {
+		keys, _ := annotationsValue.Map().Keys()
+		for _, key := range keys {
+			if value, _ := annotationsValue.Map().Get(key); value.Kind() == automerge.KindStr {
+				output.Annotations[key] = value.Str()
+			}
+		}
+	}
+
 	return output, nil
 }
 
@@ -71,19 +83,50 @@ func (p *inMemoryWorkspaceProvider) GetTodo(ctx context.Context, id string) (*To
 }
 
 func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error) {
+	var err error
+	params.Title, err = ValidateTodoTitle(params.Title)
+	if err != nil {
+		return nil, err
+	}
+	params.Description, err = ValidateTodoDescription(params.Description)
+	if err != nil {
+		return nil, err
+	}
+
+	status := "open"
+	if params.Status != nil {
+		status, err = ValidateTodoStatus(*params.Status)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if params.Annotations != nil {
+		for k, v := range params.Annotations {
+			if err := ValidateTodoAnnotationKey(k); err != nil {
+				return nil, errors.Wrapf(err, "invalid annotation key '%s'", k)
+			} else if v == "" {
+				return nil, errors.Errorf("annotation '%s' has an empty value", k)
+			}
+		}
+	} else {
+		params.Annotations = make(map[string]string)
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
 	todos := p.Doc.Path("todos").Map()
 	todoId := ulid.Make().String()
 	// TODO: check for conflict
+
 	newTodo := automerge.NewMap()
 	if err := todos.Set(todoId, newTodo); err != nil {
 		return nil, errors.Wrap(err, "failed to set todo entry")
 	}
 
 	createdAt := time.Now().UTC().Truncate(time.Second)
-	if err := newTodo.Set("status", params.Status); err != nil {
+	if err := newTodo.Set("status", status); err != nil {
 		return nil, errors.Wrap(err, "failed to set status")
 	} else if err := newTodo.Set("created_at", createdAt); err != nil {
 		return nil, errors.Wrap(err, "failed to set created_at")
@@ -94,13 +137,74 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	if err := newTodo.Set("description", automerge.NewText(params.Description)); err != nil {
 		return nil, errors.Wrap(err, "failed to set description")
 	}
+
+	newAnnotations := automerge.NewMap()
+	_ = newTodo.Set("annotations", newAnnotations)
+	for k, v := range params.Annotations {
+		_ = newAnnotations.Set(k, v)
+	}
+
 	if _, err := p.Doc.Commit("created todo " + todoId); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
-	return &Todo{Id: todoId, CreatedAt: createdAt, Status: params.Status, Title: params.Title, Description: params.Description}, nil
+	return getTodoInner(todos, todoId)
 }
 
 func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error) {
+	if params.Title != nil {
+		o, err := ValidateTodoTitle(*params.Title)
+		if err != nil {
+			return nil, err
+		}
+		params.Title = &o
+	}
+	if params.Description != nil {
+		o, err := ValidateTodoDescription(*params.Description)
+		if err != nil {
+			return nil, err
+		}
+		params.Description = &o
+	}
+	if params.Status != nil {
+		o, err := ValidateTodoStatus(*params.Status)
+		if err != nil {
+			return nil, err
+		}
+		params.Status = &o
+	}
+
+	if params.Title != nil {
+		if pt, err := ValidateAndCleanUnicode(*params.Title, false); err != nil {
+			return nil, errors.Wrap(err, "invalid title")
+		} else if pt, d := strings.TrimSpace(pt), MinimumTodoTitleLength; len(pt) < d {
+			return nil, errors.Errorf("title is too short, it should be at least %d characters", d)
+		} else if d := MaximumTodoTitleLength; len(pt) > d {
+			return nil, errors.Errorf("title is too long, it should be at most %d characters", d)
+		} else {
+			params.Title = &pt
+		}
+	}
+
+	if params.Description != nil {
+		if pt, err := ValidateAndCleanUnicode(*params.Description, true); err != nil {
+			return nil, errors.Wrap(err, "invalid description")
+		} else if d := MaximumDescriptionLength; len(pt) > d {
+			return nil, errors.Errorf("description is too long, it should be at most %d characters", d)
+		} else {
+			params.Description = &pt
+		}
+	}
+
+	if params.Annotations != nil {
+		for k := range params.Annotations {
+			if err := ValidateTodoAnnotationKey(k); err != nil {
+				return nil, errors.Wrapf(err, "invalid annotation key '%s'", k)
+			}
+		}
+	} else {
+		params.Annotations = make(map[string]string)
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
@@ -128,10 +232,25 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		}
 		td.Status = *params.Status
 	}
+
+	annotationsValue, _ := todoValue.Map().Get("annotations")
+	if annotationsValue.Kind() == automerge.KindVoid {
+		annotationsMap := automerge.NewMap()
+		_ = todoValue.Map().Set("annotations", annotationsMap)
+		annotationsValue, _ = todoValue.Map().Get("annotations")
+	}
+	for k, v := range params.Annotations {
+		if v == "" {
+			_ = annotationsValue.Map().Delete(k)
+		} else {
+			_ = annotationsValue.Map().Set(k, v)
+		}
+	}
+
 	if _, err := p.Doc.Commit("edited todo " + id); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
-	return td, nil
+	return getTodoInner(todos, id)
 }
 
 func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) error {

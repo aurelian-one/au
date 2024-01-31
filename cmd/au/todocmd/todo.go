@@ -86,7 +86,7 @@ var createCommand = &cobra.Command{
 		}
 		defer ws.Close()
 
-		params := au.CreateTodoParams{Status: "open"}
+		params := au.CreateTodoParams{}
 
 		if v, err := cmd.Flags().GetString("title"); err != nil {
 			return errors.Wrap(err, "failed to get title flag")
