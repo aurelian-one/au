@@ -1,7 +1,6 @@
 package todocmd
 
 import (
-	"os"
 	"slices"
 
 	"github.com/pkg/errors"
@@ -36,7 +35,7 @@ var getCommand = &cobra.Command{
 			return err
 		}
 
-		encoder := yaml.NewEncoder(os.Stdout)
+		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
 		return encoder.Encode(todo)
 	},
@@ -65,7 +64,7 @@ var listCommand = &cobra.Command{
 		slices.SortFunc(todos, func(a, b au.Todo) int {
 			return a.CreatedAt.Compare(b.CreatedAt)
 		})
-		encoder := yaml.NewEncoder(os.Stdout)
+		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
 		return encoder.Encode(todos)
 	},
@@ -105,7 +104,7 @@ var createCommand = &cobra.Command{
 		} else if err := ws.Flush(); err != nil {
 			return errors.Wrap(err, "failed to flush to file")
 		} else {
-			encoder := yaml.NewEncoder(os.Stdout)
+			encoder := yaml.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent(2)
 			return encoder.Encode(todo)
 		}
@@ -150,7 +149,7 @@ var editCommand = &cobra.Command{
 		} else if err := ws.Flush(); err != nil {
 			return errors.Wrap(err, "failed to flush to file")
 		} else {
-			encoder := yaml.NewEncoder(os.Stdout)
+			encoder := yaml.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent(2)
 			return encoder.Encode(todo)
 		}
