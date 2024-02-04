@@ -33,9 +33,15 @@ var initCommand = &cobra.Command{
 	ArgAliases: []string{"alias"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
 		metadata, err := s.CreateWorkspace(cmd.Context(), au.CreateWorkspaceParams{Alias: cmd.Flags().Arg(0)})
 		if err != nil {
 			return err
+		}
+		if w == "" {
+			if err := s.SetCurrentWorkspace(cmd.Context(), metadata.Id); err != nil {
+				return errors.Wrap(err, "failed to set new workspace as current")
+			}
 		}
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
@@ -55,6 +61,25 @@ var listCommand = &cobra.Command{
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
 		return encoder.Encode(metadataList)
+	},
+}
+
+var getCommand = &cobra.Command{
+	Use:  "get",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		if meta, err := s.GetWorkspace(cmd.Context(), w); err != nil {
+			return err
+		} else {
+			encoder := yaml.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent(2)
+			return encoder.Encode(meta)
+		}
 	},
 }
 
@@ -219,6 +244,7 @@ var syncImportCommand = &cobra.Command{
 func init() {
 	Command.AddCommand(
 		initCommand,
+		getCommand,
 		listCommand,
 		useCommand,
 		deleteCommand,
