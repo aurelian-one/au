@@ -58,6 +58,25 @@ var listCommand = &cobra.Command{
 	},
 }
 
+var getCommand = &cobra.Command{
+	Use:  "get",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		if meta, err := s.GetWorkspace(cmd.Context(), w); err != nil {
+			return err
+		} else {
+			encoder := yaml.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent(2)
+			return encoder.Encode(meta)
+		}
+	},
+}
+
 var useCommand = &cobra.Command{
 	Use:        "use <uid>",
 	Args:       cobra.ExactArgs(1),
@@ -219,6 +238,7 @@ var syncImportCommand = &cobra.Command{
 func init() {
 	Command.AddCommand(
 		initCommand,
+		getCommand,
 		listCommand,
 		useCommand,
 		deleteCommand,

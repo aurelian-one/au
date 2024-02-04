@@ -37,6 +37,10 @@ func TestCli_create_and_delete(t *testing.T) {
 	assert.Equal(t, "[]\n", buff.String())
 
 	buff.Reset()
+	rootCmd.SetArgs([]string{"workspace", "get"})
+	assert.EqualError(t, rootCmd.Execute(), "current workspace not set")
+
+	buff.Reset()
 	rootCmd.SetArgs([]string{"workspace", "init", "Example Workspace"})
 	assert.NoError(t, rootCmd.Execute())
 	var out struct {
@@ -47,10 +51,21 @@ func TestCli_create_and_delete(t *testing.T) {
 	workspaceId := out.Id
 
 	buff.Reset()
+	rootCmd.SetArgs([]string{"workspace", "get"})
+	assert.EqualError(t, rootCmd.Execute(), "current workspace not set")
+
+	buff.Reset()
 	rootCmd.SetArgs([]string{"workspace", "use", workspaceId})
 	assert.NoError(t, rootCmd.Execute())
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
 	assert.Equal(t, workspaceId, out.Id)
+
+	buff.Reset()
+	rootCmd.SetArgs([]string{"workspace", "get"})
+	var outStruct map[string]interface{}
+	assert.NoError(t, rootCmd.Execute())
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	assert.Equal(t, workspaceId, outStruct["id"].(string))
 
 	buff.Reset()
 	rootCmd.SetArgs([]string{"workspace", "list"})
