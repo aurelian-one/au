@@ -11,6 +11,8 @@ import (
 const (
 	ConfigDirEnvironmentVariable    = "AU_DIRECTORY"
 	WorkspaceUidEnvironmentVariable = "AU_WORKSPACE"
+	EditorVariable                  = "AU_EDITOR"
+	GlobalEditorVariable            = "EDITOR"
 	DefaultConfigDir                = "$HOME/.au"
 )
 
