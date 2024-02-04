@@ -7,6 +7,7 @@ Terms used below:
 
 - `Workspace` - A collection of Todos and metadata. Clients collaborate on a Workspace level.
 - `Todo` - A task within a Workspace.
+- `Comment` - A attached Comment for a Todo
 
 ## 1. An Aurelian Workspace is a native decompressed Automerge Document
 
@@ -69,6 +70,10 @@ by multiple participants.
 
 The contents should be valid multi-line UTF-8 according to section 3.1 in this document and should contain at most 5000 "characters".
 
+#### `created_at` - KindTime
+
+The time the Todo was created. Usually not editable.
+
 #### `status` - KindStr
 
 The required status of the todo. The status is either `open` or `closed`. All todos default to `open`. `closed` should be
@@ -93,6 +98,30 @@ Examples of how annotations may be used:
 - Hiding a todo until a target date/time (eg: `https//github.com/my-au-bot/hide-until: 2025-01-01`)
 
 Annotations should be used carefully.
+
+#### `comments` - KindMap
+
+Comments are used to add supporting (usually immutable) attachment content to each Todo. This will usually be Markdown
+content like the Todo description itself but can be extended with other content types in the future. This is why there
+is an associated media type.
+
+Each key in this map should be a valid ULID, see https://github.com/ulid/spec. This Id is assumed to be unique within the 
+todo, but not unique across todos.
+
+Each comment has the format:
+
+#### `created_at` - KindTime
+
+The time the Comment was created. Usually not editable.
+
+#### `media_type` - KindStr
+
+The media/content type of the Comment. This should be a valid MIME Type https://datatracker.ietf.org/doc/html/rfc2046 but
+will usually default to `text/markdown`.
+
+#### `content` - KindBytes
+
+The content of the comment. This is assumed to be UTF-8 encoded for `text/markdown`. 
 
 ## 3. Appendix
 
