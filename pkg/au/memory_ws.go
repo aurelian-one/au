@@ -68,6 +68,12 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 		}
 	}
 
+	if commentsValue, _ := item.Map().Get("comments"); commentsValue.Kind() == automerge.KindVoid {
+		output.CommentCount = 0
+	} else if commentsValue.Kind() == automerge.KindMap {
+		output.CommentCount = commentsValue.Map().Len()
+	}
+
 	return output, nil
 }
 
@@ -269,6 +275,26 @@ func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) e
 		return errors.Wrap(err, "failed to commit")
 	}
 	return nil
+}
+
+func (p *inMemoryWorkspaceProvider) ListComments(ctx context.Context, todoId string) ([]Comment, error) {
+	return make([]Comment, 0), nil
+}
+
+func (p *inMemoryWorkspaceProvider) GetComment(ctx context.Context, todoId, commentId string) (*Comment, error) {
+	return nil, errors.Errorf("comment with id '%s' on todo '%s' does not exist", commentId, todoId)
+}
+
+func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId string, params CreateCommentParams) (*Comment, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, commentId string, params EditCommentParams) (*Comment, error) {
+	return nil, errors.Errorf("comment with id '%s' on todo '%s' does not exist", commentId, todoId)
+}
+
+func (p *inMemoryWorkspaceProvider) DeleteComment(ctx context.Context, todoId, commentId string) error {
+	return errors.Errorf("comment with id '%s' on todo '%s' does not exist", commentId, todoId)
 }
 
 func (p *inMemoryWorkspaceProvider) Flush() error {

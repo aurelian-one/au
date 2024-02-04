@@ -9,7 +9,7 @@ Terms used below:
 - `Todo` - A task within a Workspace.
 - `Comment` - A attached Comment for a Todo
 
-## 1. An Aurelian Workspace is a native decompressed Automerge Document
+## 1. An Aurelian Workspace is a native uncompressed Automerge Document
 
 An Aurelian Workspace is a raw byte array. These bytes follow the "Binary Document Format" as described in https://automerge.org/automerge-binary-format-spec/.
 
@@ -19,6 +19,10 @@ to allow for broader compatibility.
 
 Aurelian workspaces are also not encrypted in any particular way in this specification. Any encryption is
 left up to the client or server implementation.
+
+Note that Aurelian Workspaces may be quite large since all history is stored and there may be embedded binary attachments.
+However, because documents are usually synchronised by exchanging only the changes required, there is usually relatively
+little bandwidth penalty as the document grows.
 
 ## 2. The structure
 

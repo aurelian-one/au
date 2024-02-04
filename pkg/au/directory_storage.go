@@ -287,6 +287,26 @@ func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string) e
 	return d.Doc.DeleteTodo(ctx, id)
 }
 
+func (d *directoryStorageWorkspace) ListComments(ctx context.Context, todoId string) ([]Comment, error) {
+	return d.Doc.ListComments(ctx, todoId)
+}
+
+func (d *directoryStorageWorkspace) GetComment(ctx context.Context, todoId, commentId string) (*Comment, error) {
+	return d.Doc.GetComment(ctx, todoId, commentId)
+}
+
+func (d *directoryStorageWorkspace) CreateComment(ctx context.Context, todoId string, params CreateCommentParams) (*Comment, error) {
+	return d.Doc.CreateComment(ctx, todoId, params)
+}
+
+func (d *directoryStorageWorkspace) EditComment(ctx context.Context, todoId, commentId string, params EditCommentParams) (*Comment, error) {
+	return d.Doc.EditComment(ctx, todoId, commentId, params)
+}
+
+func (d *directoryStorageWorkspace) DeleteComment(ctx context.Context, todoId, commentId string) error {
+	return d.Doc.DeleteComment(ctx, todoId, commentId)
+}
+
 func (d *directoryStorageWorkspace) GetDoc() *automerge.Doc {
 	return d.Doc.GetDoc()
 }

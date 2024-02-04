@@ -41,13 +41,21 @@ type WorkspaceProvider interface {
 	CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error)
 	EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error)
 	DeleteTodo(ctx context.Context, id string) error
+
+	ListComments(ctx context.Context, todoId string) ([]Comment, error)
+	GetComment(ctx context.Context, todoId, commentId string) (*Comment, error)
+	CreateComment(ctx context.Context, todoId string, params CreateCommentParams) (*Comment, error)
+	EditComment(ctx context.Context, todoId, commentId string, params EditCommentParams) (*Comment, error)
+	DeleteComment(ctx context.Context, todoId, commentId string) error
+
 	Flush() error
 	Close() error
 }
 
 type Todo struct {
-	Id        string    `yaml:"id"`
-	CreatedAt time.Time `yaml:"created_at"`
+	Id           string    `yaml:"id"`
+	CreatedAt    time.Time `yaml:"created_at"`
+	CommentCount int       `yaml:"comment_count"`
 
 	Title       string            `yaml:"title"`
 	Description string            `yaml:"description"`
@@ -67,4 +75,20 @@ type EditTodoParams struct {
 	Description *string
 	Status      *string
 	Annotations map[string]string
+}
+
+type Comment struct {
+	Id        string    `yaml:"id"`
+	CreatedAt time.Time `yaml:"created_at"`
+	MediaType string    `yaml:"media_type"`
+	Content   []byte    `yaml:"content"`
+}
+
+type CreateCommentParams struct {
+	MediaType string
+	Content   []byte
+}
+
+type EditCommentParams struct {
+	Content []byte
 }
