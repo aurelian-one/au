@@ -51,13 +51,16 @@ func (d *directoryStorage) ListWorkspaces(ctx context.Context) ([]WorkspaceMeta,
 			}
 		}
 	}
-	output := make([]WorkspaceMeta, len(workspaceUids))
-	for i, uid := range workspaceUids {
+	output := make([]WorkspaceMeta, 0, len(workspaceUids))
+	for _, uid := range workspaceUids {
 		inner, err := d.GetWorkspace(ctx, uid)
 		if err != nil {
-			return nil, errors.Wrapf(err, "%s: failed to get workspace", uid)
+			if !errors.Is(err, os.ErrNotExist) {
+				return nil, errors.Wrapf(err, "%s: failed to get workspace", uid)
+			}
+		} else {
+			output = append(output, *inner)
 		}
-		output[i] = *inner
 	}
 	return output, nil
 }

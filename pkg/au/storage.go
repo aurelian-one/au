@@ -46,13 +46,13 @@ type WorkspaceProvider interface {
 }
 
 type Todo struct {
-	Id        string
-	CreatedAt time.Time
+	Id        string    `yaml:"id"`
+	CreatedAt time.Time `yaml:"created_at"`
 
-	Title       string
-	Description string
-	Status      string
-	Annotations map[string]string
+	Title       string            `yaml:"title"`
+	Description string            `yaml:"description"`
+	Status      string            `yaml:"status"`
+	Annotations map[string]string `yaml:"annotations"`
 }
 
 type CreateTodoParams struct {
