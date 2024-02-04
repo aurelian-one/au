@@ -52,20 +52,16 @@ func TestCli_create_and_delete(t *testing.T) {
 
 	buff.Reset()
 	rootCmd.SetArgs([]string{"workspace", "get"})
-	assert.EqualError(t, rootCmd.Execute(), "current workspace not set")
+	var outStruct map[string]interface{}
+	assert.NoError(t, rootCmd.Execute())
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	assert.Equal(t, workspaceId, outStruct["id"].(string))
 
 	buff.Reset()
 	rootCmd.SetArgs([]string{"workspace", "use", workspaceId})
 	assert.NoError(t, rootCmd.Execute())
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
 	assert.Equal(t, workspaceId, out.Id)
-
-	buff.Reset()
-	rootCmd.SetArgs([]string{"workspace", "get"})
-	var outStruct map[string]interface{}
-	assert.NoError(t, rootCmd.Execute())
-	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
-	assert.Equal(t, workspaceId, outStruct["id"].(string))
 
 	buff.Reset()
 	rootCmd.SetArgs([]string{"workspace", "list"})
