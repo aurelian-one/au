@@ -99,6 +99,17 @@ var createCommand = &cobra.Command{
 			params.Description = v
 		}
 
+		if v, err := cmd.Flags().GetBool("edit"); err != nil {
+			return errors.Wrap(err, "failed to get edit flag")
+		} else if v {
+			t, d, err := common.EditTitleAndDescription(cmd.Context(), params.Title, params.Description)
+			if err != nil {
+				return err
+			}
+			params.Title = t
+			params.Description = d
+		}
+
 		if todo, err := ws.CreateTodo(cmd.Context(), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
@@ -127,6 +138,11 @@ var editCommand = &cobra.Command{
 		}
 		defer ws.Close()
 
+		todo, err := ws.GetTodo(cmd.Context(), cmd.Flags().Arg(0))
+		if err != nil {
+			return err
+		}
+
 		params := au.EditTodoParams{}
 		if v, err := cmd.Flags().GetString("title"); err != nil {
 			return errors.Wrap(err, "failed to get title flag")
@@ -142,6 +158,24 @@ var editCommand = &cobra.Command{
 			return errors.Wrap(err, "failed to get status flag")
 		} else if v != "" {
 			params.Status = &v
+		}
+
+		if v, err := cmd.Flags().GetBool("edit"); err != nil {
+			return errors.Wrap(err, "failed to get edit flag")
+		} else if v {
+			tt, dd := todo.Title, todo.Description
+			if params.Title != nil {
+				tt = *params.Title
+			}
+			if params.Description != nil {
+				dd = *params.Description
+			}
+			t, d, err := common.EditTitleAndDescription(cmd.Context(), tt, dd)
+			if err != nil {
+				return err
+			}
+			params.Title = &t
+			params.Description = &d
 		}
 
 		if todo, err := ws.EditTodo(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
@@ -183,12 +217,13 @@ var deleteCommand = &cobra.Command{
 
 func init() {
 	createCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
-	_ = createCommand.MarkFlagRequired("title")
 	createCommand.Flags().String("description", "", "Set the description of the Todo")
+	createCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
 
 	editCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	editCommand.Flags().String("description", "", "Set the description of the Todo")
 	editCommand.Flags().String("status", "", "Set the status of the Todo")
+	editCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
 
 	Command.AddCommand(
 		getCommand,
