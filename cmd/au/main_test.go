@@ -118,11 +118,12 @@ func TestCli_create_todos(t *testing.T) {
 	_, err = ulid.Parse(todoId)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]interface{}{
-		"id":          todoId,
-		"title":       "My todo",
-		"description": "Some longer description of the todo",
-		"status":      "open",
-		"annotations": map[string]interface{}{},
+		"id":            todoId,
+		"title":         "My todo",
+		"description":   "Some longer description of the todo",
+		"status":        "open",
+		"annotations":   map[string]interface{}{},
+		"comment_count": 0,
 	}, outStruct)
 
 	buff.Reset()
@@ -145,11 +146,12 @@ func TestCli_create_todos(t *testing.T) {
 	assert.NotNil(t, outStruct["created_at"].(time.Time))
 	delete(outStruct, "created_at")
 	assert.Equal(t, map[string]interface{}{
-		"id":          todoId,
-		"title":       "My todo 2",
-		"description": "Edited description",
-		"status":      "closed",
-		"annotations": map[string]interface{}{},
+		"id":            todoId,
+		"title":         "My todo 2",
+		"description":   "Edited description",
+		"status":        "closed",
+		"annotations":   map[string]interface{}{},
+		"comment_count": 0,
 	}, outStruct)
 
 	buff.Reset()

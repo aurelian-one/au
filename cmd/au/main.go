@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/aurelian-one/au/cmd/au/commentcmd"
 	"github.com/aurelian-one/au/cmd/au/common"
 	"github.com/aurelian-one/au/cmd/au/devcmd"
 	"github.com/aurelian-one/au/cmd/au/todocmd"
@@ -152,6 +153,7 @@ falling back to current symlink".`, au.WorkspaceUidEnvironmentVariable)),
 	rootCmd.AddCommand(
 		workspacecmd.Command,
 		todocmd.Command,
+		commentcmd.Command,
 		devcmd.Command,
 		versionCmd,
 	)

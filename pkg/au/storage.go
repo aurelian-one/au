@@ -78,10 +78,10 @@ type EditTodoParams struct {
 }
 
 type Comment struct {
-	Id        string    `yaml:"id"`
-	CreatedAt time.Time `yaml:"created_at"`
-	MediaType string    `yaml:"media_type"`
-	Content   []byte    `yaml:"content"`
+	Id        string
+	CreatedAt time.Time
+	MediaType string
+	Content   string
 }
 
 type CreateCommentParams struct {

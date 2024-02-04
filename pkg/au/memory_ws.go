@@ -2,6 +2,8 @@ package au
 
 import (
 	"context"
+	"encoding/base64"
+	"mime"
 	"strings"
 	"sync"
 	"time"
@@ -278,23 +280,186 @@ func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) e
 }
 
 func (p *inMemoryWorkspaceProvider) ListComments(ctx context.Context, todoId string) ([]Comment, error) {
-	return make([]Comment, 0), nil
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	_, err := getTodoInner(todos, todoId)
+	if err != nil {
+		return nil, err
+	}
+	commentsValue, err := todos.Get("comments")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get comments in todos")
+	} else if commentsValue.Kind() == automerge.KindVoid {
+		_ = todos.Set("comments", automerge.NewMap())
+		commentsValue, _ = todos.Get("comments")
+	} else if commentsValue.Kind() != automerge.KindMap {
+		return nil, errors.New("todo comments is not a map")
+	}
+
+	commentIds, _ := commentsValue.Map().Keys()
+	output := make([]Comment, len(commentIds))
+	for i, id := range commentIds {
+		c, err := getCommentInner(commentsValue.Map(), id)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get todo")
+		}
+		output[i] = *c
+	}
+	return output, nil
+}
+
+func getCommentInner(comments *automerge.Map, id string) (*Comment, error) {
+	item, err := comments.Get(id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get comment")
+	} else if item.Kind() != automerge.KindMap {
+		return nil, errors.Errorf("comment with id '%s' does not exist", id)
+	}
+	output := new(Comment)
+	output.Id = id
+	if mediaTypeValue, _ := item.Map().Get("media_type"); mediaTypeValue.Kind() == automerge.KindStr {
+		output.MediaType = mediaTypeValue.Str()
+	}
+	if contentValue, _ := item.Map().Get("content"); contentValue.Kind() == automerge.KindBytes {
+		if output.MediaType == "text/markdown" {
+			output.Content = string(contentValue.Bytes())
+		} else {
+			output.Content = base64.StdEncoding.EncodeToString(contentValue.Bytes())
+		}
+	}
+	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
+		output.CreatedAt = createdAtValue.Time().In(time.UTC)
+	}
+	return output, nil
 }
 
 func (p *inMemoryWorkspaceProvider) GetComment(ctx context.Context, todoId, commentId string) (*Comment, error) {
-	return nil, errors.Errorf("comment with id '%s' on todo '%s' does not exist", commentId, todoId)
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	_, err := getTodoInner(todos, todoId)
+	if err != nil {
+		return nil, err
+	}
+	commentsValue, err := todos.Get("comments")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get comments in todos")
+	} else if commentsValue.Kind() == automerge.KindVoid {
+		_ = todos.Set("comments", automerge.NewMap())
+		commentsValue, _ = todos.Get("comments")
+	} else if commentsValue.Kind() != automerge.KindMap {
+		return nil, errors.New("todo comments is not a map")
+	}
+	return getCommentInner(commentsValue.Map(), commentId)
 }
 
 func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId string, params CreateCommentParams) (*Comment, error) {
-	return nil, errors.New("not implemented")
+	if _, _, err := mime.ParseMediaType(params.MediaType); err != nil {
+		return nil, errors.Wrap(err, "invalid mime type")
+	}
+
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	_, err := getTodoInner(todos, todoId)
+	if err != nil {
+		return nil, err
+	}
+
+	commentsValue, err := todos.Get("comments")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get comments in todos")
+	} else if commentsValue.Kind() == automerge.KindVoid {
+		_ = todos.Set("comments", automerge.NewMap())
+		commentsValue, _ = todos.Get("comments")
+	} else if commentsValue.Kind() != automerge.KindMap {
+		return nil, errors.New("todo comments is not a map")
+	}
+
+	newComment := automerge.NewMap()
+	newCommentId := ulid.Make().String()
+	if err := commentsValue.Map().Set(newCommentId, newComment); err != nil {
+		return nil, errors.New("failed to set comment in todo")
+	}
+	createdAt := time.Now().UTC().Truncate(time.Second)
+	if err := newComment.Set("created_at", createdAt); err != nil {
+		return nil, errors.Wrap(err, "failed to set created_at")
+	} else if err := newComment.Set("media_type", params.MediaType); err != nil {
+		return nil, errors.Wrap(err, "failed to set media type")
+	} else if err := newComment.Set("content", params.Content); err != nil {
+		return nil, errors.Wrap(err, "failed to set content")
+	}
+
+	if _, err := p.Doc.Commit("created comment " + newCommentId + " in todo " + todoId); err != nil {
+		return nil, errors.Wrap(err, "failed to commit")
+	}
+	return getCommentInner(commentsValue.Map(), newCommentId)
 }
 
 func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, commentId string, params EditCommentParams) (*Comment, error) {
-	return nil, errors.Errorf("comment with id '%s' on todo '%s' does not exist", commentId, todoId)
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	_, err := getTodoInner(todos, todoId)
+	if err != nil {
+		return nil, err
+	}
+
+	commentsValue, err := todos.Get("comments")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get comments in todos")
+	} else if commentsValue.Kind() == automerge.KindVoid {
+		_ = todos.Set("comments", automerge.NewMap())
+		commentsValue, _ = todos.Get("comments")
+	} else if commentsValue.Kind() != automerge.KindMap {
+		return nil, errors.New("todo comments is not a map")
+	}
+
+	commentValue, err := commentsValue.Map().Get(commentId)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get comment")
+	} else if commentValue.Kind() != automerge.KindMap {
+		return nil, errors.Wrap(err, "comment is not a map")
+	} else if err = commentValue.Map().Set("content", params.Content); err != nil {
+		return nil, errors.Wrap(err, "failed to set content")
+	}
+
+	if _, err := p.Doc.Commit("edited comment " + commentId + " in todo " + todoId); err != nil {
+		return nil, errors.Wrap(err, "failed to commit")
+	}
+	return getCommentInner(commentsValue.Map(), commentId)
 }
 
 func (p *inMemoryWorkspaceProvider) DeleteComment(ctx context.Context, todoId, commentId string) error {
-	return errors.Errorf("comment with id '%s' on todo '%s' does not exist", commentId, todoId)
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+
+	todos := p.Doc.Path("todos").Map()
+	_, err := getTodoInner(todos, todoId)
+	if err != nil {
+		return err
+	}
+
+	commentsValue, err := todos.Get("comments")
+	if err != nil {
+		return errors.Wrap(err, "failed to get comments in todos")
+	} else if commentsValue.Kind() == automerge.KindVoid {
+		_ = todos.Set("comments", automerge.NewMap())
+		commentsValue, _ = todos.Get("comments")
+	} else if commentsValue.Kind() != automerge.KindMap {
+		return errors.New("todo comments is not a map")
+	} else if err = commentsValue.Map().Delete(commentId); err != nil {
+		return errors.New("failed to delete comment")
+	}
+	if _, err := p.Doc.Commit("deleted comment " + commentId + " in todo " + todoId); err != nil {
+		return errors.Wrap(err, "failed to commit")
+	}
+	return nil
 }
 
 func (p *inMemoryWorkspaceProvider) Flush() error {
