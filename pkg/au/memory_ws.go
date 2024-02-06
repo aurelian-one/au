@@ -361,6 +361,18 @@ func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId st
 		return nil, errors.Wrap(err, "invalid mime type")
 	}
 
+	if params.MediaType == "text/markdown" {
+		if c, err := ValidateAndCleanUnicode(string(params.Content), true); err != nil {
+			return nil, err
+		} else if len(c) == 0 {
+			return nil, errors.New("content is empty")
+		} else {
+			params.Content = []byte(c)
+		}
+	} else if len(params.Content) == 0 {
+		return nil, errors.New("content is empty")
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
@@ -425,7 +437,28 @@ func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, com
 		return nil, errors.Wrap(err, "failed to get comment")
 	} else if commentValue.Kind() != automerge.KindMap {
 		return nil, errors.Wrap(err, "comment is not a map")
-	} else if err = commentValue.Map().Set("content", params.Content); err != nil {
+	}
+
+	if mediaTypeValue, err := commentValue.Map().Get("media_type"); err != nil {
+		return nil, errors.Wrap(err, "failed to get media type from comment")
+	} else if mediaTypeValue.Kind() != automerge.KindStr {
+		return nil, errors.Wrap(err, "media type is not a string")
+	} else {
+		mediaType := mediaTypeValue.Str()
+		if mediaType == "text/markdown" {
+			if c, err := ValidateAndCleanUnicode(string(params.Content), true); err != nil {
+				return nil, err
+			} else if len(c) == 0 {
+				return nil, errors.New("content is empty")
+			} else {
+				params.Content = []byte(c)
+			}
+		} else if len(params.Content) == 0 {
+			return nil, errors.New("content is empty")
+		}
+	}
+
+	if err = commentValue.Map().Set("content", params.Content); err != nil {
 		return nil, errors.Wrap(err, "failed to set content")
 	}
 

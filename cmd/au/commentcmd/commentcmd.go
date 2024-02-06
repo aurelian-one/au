@@ -162,13 +162,15 @@ var deleteCommand = &cobra.Command{
 		if w == "" {
 			return errors.New("current workspace not set")
 		}
-		ws, err := s.OpenWorkspace(cmd.Context(), w, false)
+		ws, err := s.OpenWorkspace(cmd.Context(), w, true)
 		if err != nil {
 			return err
 		}
 		defer ws.Close()
 		if err := ws.DeleteComment(cmd.Context(), cmd.Flags().Arg(0), cmd.Flags().Arg(1)); err != nil {
 			return err
+		} else if err := ws.Flush(); err != nil {
+			return errors.Wrap(err, "failed to flush to file")
 		}
 		return nil
 	},
@@ -178,7 +180,7 @@ func init() {
 	createCommand.Flags().StringP("markdown", "m", "", "Set the markdown content of the comment")
 	createCommand.Flags().Bool("edit", false, "Edit the content using AU_EDITOR")
 
-	editCommand.Flags().StringP("title", "m", "", "Set the markdown content of the comment")
+	editCommand.Flags().StringP("markdown", "m", "", "Set the markdown content of the comment")
 	editCommand.Flags().Bool("edit", false, "Edit the content using AU_EDITOR")
 
 	Command.AddCommand(
