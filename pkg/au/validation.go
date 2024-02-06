@@ -10,6 +10,7 @@ import (
 const MinimumTodoTitleLength = 3
 const MaximumTodoTitleLength = 200
 const MaximumDescriptionLength = 5000
+const DefaultCommentMediaType = "text/markdown"
 
 func ValidateWorkspaceAlias(input string) (string, error) {
 	if pa, err := ValidateAndCleanUnicode(input, false); err != nil {
