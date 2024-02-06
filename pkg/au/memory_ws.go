@@ -323,7 +323,7 @@ func getCommentInner(comments *automerge.Map, id string) (*Comment, error) {
 		output.MediaType = mediaTypeValue.Str()
 	}
 	if contentValue, _ := item.Map().Get("content"); contentValue.Kind() == automerge.KindBytes {
-		if output.MediaType == "text/markdown" {
+		if output.MediaType == DefaultCommentMediaType {
 			output.Content = string(contentValue.Bytes())
 		} else {
 			output.Content = base64.StdEncoding.EncodeToString(contentValue.Bytes())
@@ -361,7 +361,7 @@ func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId st
 		return nil, errors.Wrap(err, "invalid mime type")
 	}
 
-	if params.MediaType == "text/markdown" {
+	if params.MediaType == DefaultCommentMediaType {
 		if c, err := ValidateAndCleanUnicode(string(params.Content), true); err != nil {
 			return nil, err
 		} else if len(c) == 0 {
@@ -445,7 +445,7 @@ func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, com
 		return nil, errors.Wrap(err, "media type is not a string")
 	} else {
 		mediaType := mediaTypeValue.Str()
-		if mediaType == "text/markdown" {
+		if mediaType == DefaultCommentMediaType {
 			if c, err := ValidateAndCleanUnicode(string(params.Content), true); err != nil {
 				return nil, err
 			} else if len(c) == 0 {

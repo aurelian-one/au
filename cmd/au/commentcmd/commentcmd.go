@@ -93,7 +93,21 @@ var createCommand = &cobra.Command{
 			return errors.Wrap(err, "failed to get markdown content flag")
 		} else {
 			params.Content = []byte(v)
-			params.MediaType = "text/markdown"
+			params.MediaType = au.DefaultCommentMediaType
+		}
+
+		if v, err := cmd.Flags().GetBool("edit"); err != nil {
+			return errors.Wrap(err, "failed to get edit flag")
+		} else if v {
+			c := ""
+			if params.Content != nil {
+				c = string(params.Content)
+			}
+			after, err := common.EditContent(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			params.Content = []byte(after)
 		}
 
 		if todo, err := ws.CreateComment(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
@@ -129,7 +143,7 @@ var editCommand = &cobra.Command{
 			return err
 		}
 
-		if comment.MediaType != "text/markdown" {
+		if comment.MediaType != au.DefaultCommentMediaType {
 			return errors.New("cannot edit the content of a non-markdown comment")
 		}
 
@@ -138,6 +152,20 @@ var editCommand = &cobra.Command{
 			return errors.Wrap(err, "failed to get markdown content flag")
 		} else if v != "" {
 			params.Content = []byte(v)
+		}
+
+		if v, err := cmd.Flags().GetBool("edit"); err != nil {
+			return errors.Wrap(err, "failed to get edit flag")
+		} else if v {
+			c := comment.Content
+			if params.Content != nil {
+				c = string(params.Content)
+			}
+			after, err := common.EditContent(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			params.Content = []byte(after)
 		}
 
 		if comment, err := ws.EditComment(cmd.Context(), cmd.Flags().Arg(0), cmd.Flags().Arg(1), params); err != nil {
