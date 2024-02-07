@@ -2,6 +2,7 @@ package todocmd
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -64,6 +65,11 @@ var listCommand = &cobra.Command{
 
 		slices.SortFunc(todos, func(a, b au.Todo) int {
 			return a.CreatedAt.Compare(b.CreatedAt)
+		})
+		slices.SortStableFunc(todos, func(a, b au.Todo) int {
+			rankA, _ := strconv.Atoi(a.Annotations[au.AurelianRankAnnotation])
+			rankB, _ := strconv.Atoi(b.Annotations[au.AurelianRankAnnotation])
+			return rankB - rankA
 		})
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)

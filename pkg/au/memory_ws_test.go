@@ -59,6 +59,46 @@ func TestCreateTodo_success(t *testing.T) {
 	assert.Equal(t, td, td2)
 }
 
+func TestCreateTodo_invalid_annotations(t *testing.T) {
+	s := newDirectoryStorage(t)
+	ws, _ := s.CreateWorkspace(context.Background(), CreateWorkspaceParams{Alias: "testing"})
+	wsp, _ := s.OpenWorkspace(context.Background(), ws.Id, true)
+
+	for _, tc := range []struct {
+		Key           string
+		Value         string
+		ExpectedError string
+	}{
+		{"not a uri", "true", "invalid annotation key 'not a uri': missing a uri scheme"},
+		{"about:blank", "true", ""},
+		{"http://aurelian.one/thing", "true", "invalid annotation key 'http://aurelian.one/thing': 'aurelian.one' annotations require an https scheme"},
+		{"https://user@aurelian.one/thing", "true", "invalid annotation key 'https://user@aurelian.one/thing': 'aurelian.one' annotations cannot have user info"},
+		{"https://aurelian.one:44/thing", "true", "invalid annotation key 'https://aurelian.one:44/thing': 'aurelian.one' annotations cannot have a port"},
+		{"https://aurelian.one/thing?q=1", "true", "invalid annotation key 'https://aurelian.one/thing?q=1': 'aurelian.one' annotations cannot have a query string"},
+		{"https://aurelian.one/thing", "true", "invalid annotation key 'https://aurelian.one/thing': 'aurelian.one' annotation path must match /annotations/* pattern"},
+		{"https://aurelian.one/annotations/unknown", "true", "invalid annotation key 'https://aurelian.one/annotations/unknown': 'aurelian.one' 'unknown' annotation is not supported"},
+		{"https://aurelian.one/annotations/rank#t", "true", "invalid annotation key 'https://aurelian.one/annotations/rank#t': 'aurelian.one 'rank' annotation cannot have a fragment"},
+		{"https://aurelian.one/annotations/label", "true", "invalid annotation key 'https://aurelian.one/annotations/label': 'aurelian.one' 'label' annotation requires a valid fragment"},
+		{"https://aurelian/thing", "true", "invalid annotation key 'https://aurelian/thing': 'aurelian' annotation are reserved"},
+		{"https://aurelian.one/annotations/label#foo", "true", ""},
+	} {
+		t.Run(tc.Key+"="+tc.Value, func(t *testing.T) {
+			_, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
+				Title:       "Do the thing",
+				Description: "Much longer text about doing the thing",
+				Annotations: map[string]string{
+					tc.Key: tc.Value,
+				},
+			})
+			if tc.ExpectedError != "" {
+				assert.EqualError(t, err, tc.ExpectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestEditTodo_success(t *testing.T) {
 	s := newDirectoryStorage(t)
 	ws, _ := s.CreateWorkspace(context.Background(), CreateWorkspaceParams{Alias: "testing"})
