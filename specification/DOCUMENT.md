@@ -59,7 +59,7 @@ The value of the entry is a Todo (see 2.2).
 
 Each entry in the top-level `todos` map is itself an Automerge Map structure. It cotains:
 
-#### `title` - KindStr
+#### `title` - KindText
 
 The title of the Todo. This describes the goal or definition-of-done of the Todo and is therefore a static string that
 doesn't support splicing and merging. It is strictly LLW.

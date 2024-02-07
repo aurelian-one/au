@@ -44,8 +44,8 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	}
 	output := new(Todo)
 	output.Id = id
-	if titleValue, _ := item.Map().Get("title"); titleValue.Kind() == automerge.KindStr {
-		output.Title = titleValue.Str()
+	if titleValue, _ := item.Map().Get("title"); titleValue.Kind() == automerge.KindText {
+		output.Title, _ = titleValue.Text().Get()
 	}
 	if statusValue, _ := item.Map().Get("status"); statusValue.Kind() == automerge.KindStr {
 		output.Status = statusValue.Str()
@@ -53,11 +53,7 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
 		output.CreatedAt = createdAtValue.Time().In(time.UTC)
 	}
-	descriptionValue, _ := item.Map().Get("description")
-	switch descriptionValue.Kind() {
-	case automerge.KindStr:
-		output.Description = descriptionValue.Str()
-	case automerge.KindText:
+	if descriptionValue, _ := item.Map().Get("description"); descriptionValue.Kind() == automerge.KindText {
 		output.Description, _ = descriptionValue.Text().Get()
 	}
 
@@ -140,7 +136,7 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	} else if err := newTodo.Set("created_at", createdAt); err != nil {
 		return nil, errors.Wrap(err, "failed to set created_at")
 	}
-	if err := newTodo.Set("title", params.Title); err != nil {
+	if err := newTodo.Set("title", automerge.NewText(params.Title)); err != nil {
 		return nil, errors.Wrap(err, "failed to set title")
 	}
 	if err := newTodo.Set("description", automerge.NewText(params.Description)); err != nil {
@@ -224,22 +220,16 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	}
 	todoValue, _ := p.Doc.Path("todos").Map().Get(id)
 	if params.Title != nil {
-		if err := todoValue.Map().Set("title", *params.Title); err != nil {
-			return nil, errors.Wrap(err, "failed to set title on existing todo")
+		existingTitleValue, _ := todoValue.Map().Get("title")
+		if td.Description, err = spliceTextNode(existingTitleValue.Text(), *params.Title); err != nil {
+			return nil, err
 		}
-		td.Title = *params.Title
 	}
 	if params.Description != nil {
 		existingDescriptionValue, _ := todoValue.Map().Get("description")
-		// Now we can compare the before and after and work out what changed by looking for common suffix and prefix.
-		// this isn't perfect, but is better than most other systems!
-		existingDescriptionStr, _ := existingDescriptionValue.Text().Get()
-		commonPrefix, oldMiddle, newMiddle, _ := stringBreak(existingDescriptionStr, *params.Description)
-		existingText := existingDescriptionValue.Text()
-		if err := existingText.Splice(len(commonPrefix), len(oldMiddle), newMiddle); err != nil {
-			return nil, errors.Wrap(err, "failed to splice description text")
+		if td.Description, err = spliceTextNode(existingDescriptionValue.Text(), *params.Description); err != nil {
+			return nil, err
 		}
-		td.Description, _ = existingDescriptionValue.Text().Get()
 	}
 	if params.Status != nil {
 		if err := todoValue.Map().Set("status", *params.Status); err != nil {
@@ -266,6 +256,15 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getTodoInner(todos, id)
+}
+
+func spliceTextNode(node *automerge.Text, newValue string) (string, error) {
+	existingStr, _ := node.Get()
+	commonPrefix, oldMiddle, newMiddle, _ := stringBreak(existingStr, newValue)
+	if err := node.Splice(len(commonPrefix), len(oldMiddle), newMiddle); err != nil {
+		return "", errors.Wrap(err, "failed to splice")
+	}
+	return node.Get()
 }
 
 func stringBreak(before, after string) (prefix, oldMiddle, newMiddle, suffix string) {
