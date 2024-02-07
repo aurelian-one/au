@@ -201,8 +201,8 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	}
 
 	if params.Annotations != nil {
-		for k := range params.Annotations {
-			if err := ValidateTodoAnnotationKey(k); err != nil {
+		for k, v := range params.Annotations {
+			if err := ValidateTodoAnnotationKey(k); v != "" && err != nil {
 				return nil, errors.Wrapf(err, "invalid annotation key '%s'", k)
 			}
 		}

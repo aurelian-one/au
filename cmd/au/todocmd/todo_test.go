@@ -108,3 +108,43 @@ func TestCli_create_todos(t *testing.T) {
 	buff.Reset()
 	assert.EqualError(t, executeAndResetCommand(ctx, Command, []string{"get", todoId}), fmt.Sprintf("failed to get todo: todo with id '%s' does not exist", todoId))
 }
+
+func TestCli_list_ranking(t *testing.T) {
+	td, err := os.MkdirTemp(os.TempDir(), "au")
+	assert.NoError(t, err)
+
+	s, _ := au.NewDirectoryStorage(td)
+	wsMeta, err := s.CreateWorkspace(context.Background(), au.CreateWorkspaceParams{Alias: "Example"})
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.StorageContextKey, s)
+	ctx = context.WithValue(ctx, common.CurrentWorkspaceIdContextKey, wsMeta.Id)
+
+	buff := new(bytes.Buffer)
+	Command.SetOut(buff)
+	Command.SetErr(buff)
+
+	buff.Reset()
+
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", "--title", "Todo None"}))
+	for _, r := range []string{
+		"0", "0", "1", "5", "2", "0",
+	} {
+		assert.NoError(t, executeAndResetCommand(ctx, Command, []string{
+			"create", "--title", "Todo " + r, "--annotation", "https://aurelian.one/annotations/rank=" + r,
+		}))
+	}
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", "--title", "Todo None"}))
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"list"}))
+	var outSlice []map[string]interface{}
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outSlice))
+	assert.Len(t, outSlice, 8)
+	titles := make([]string, 0)
+	for _, todo := range outSlice {
+		titles = append(titles, todo["title"].(string))
+	}
+	assert.Equal(t, []string{"Todo 5", "Todo 2", "Todo 1"}, titles[:3])
+}

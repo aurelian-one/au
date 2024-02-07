@@ -67,7 +67,7 @@ func ValidateTodoAnnotationKey(key string) error {
 	if strings.TrimSpace(u.Scheme) == "" {
 		return errors.New("missing a uri scheme")
 	}
-	if u.Hostname() == "aurelian.one" {
+	if u.Hostname() == ReservedAnnotationHostname {
 		// we control this schema and there are only particular valid values here
 		if u.Scheme != "https" {
 			return errors.Errorf("'%s' annotations require an https scheme", u.Hostname())
@@ -77,10 +77,27 @@ func ValidateTodoAnnotationKey(key string) error {
 			return errors.Errorf("'%s' annotations cannot have a port", u.Hostname())
 		} else if u.RawQuery != "" {
 			return errors.Errorf("'%s' annotations cannot have a query string", u.Hostname())
-		} else if parts := strings.Split(u.Path, "/"); len(parts) != 3 || parts[1] != "annotations" || parts[2] == "" {
+		}
+		parts := strings.Split(u.Path, "/")
+		if len(parts) != 3 || parts[1] != "annotations" || parts[2] == "" {
 			return errors.Errorf("'%s' annotation path must match /annotations/* pattern", u.Hostname())
 		}
-	} else if u.Hostname() == "aurelian" {
+
+		// extra validation for known keys
+		switch parts[2] {
+		case "label":
+			if u.Fragment == "" {
+				return errors.Errorf("'%s' '%s' annotation requires a valid fragment", u.Hostname(), parts[2])
+			}
+		case "rank":
+			if u.RawFragment != "" || u.Fragment != "" {
+				return errors.Errorf("'%s '%s' annotation cannot have a fragment", u.Hostname(), parts[2])
+			}
+		default:
+			return errors.Errorf("'%s' '%s' annotation is not supported", u.Hostname(), parts[2])
+		}
+
+	} else if u.Hostname() == ReservedAnnotationShortHostname {
 		return errors.Errorf("'%s' annotation are reserved", u.Hostname())
 	}
 	return nil
