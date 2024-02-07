@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"mime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -229,10 +230,16 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		td.Title = *params.Title
 	}
 	if params.Description != nil {
-		if err := todoValue.Map().Set("description", *params.Description); err != nil {
-			return nil, errors.Wrap(err, "failed to set description on existing todo")
+		existingDescriptionValue, _ := todoValue.Map().Get("description")
+		// Now we can compare the before and after and work out what changed by looking for common suffix and prefix.
+		// this isn't perfect, but is better than most other systems!
+		existingDescriptionStr, _ := existingDescriptionValue.Text().Get()
+		commonPrefix, oldMiddle, newMiddle, _ := stringBreak(existingDescriptionStr, *params.Description)
+		existingText := existingDescriptionValue.Text()
+		if err := existingText.Splice(len(commonPrefix), len(oldMiddle), newMiddle); err != nil {
+			return nil, errors.Wrap(err, "failed to splice description text")
 		}
-		td.Description = *params.Description
+		td.Description, _ = existingDescriptionValue.Text().Get()
 	}
 	if params.Status != nil {
 		if err := todoValue.Map().Set("status", *params.Status); err != nil {
@@ -259,6 +266,57 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getTodoInner(todos, id)
+}
+
+func stringBreak(before, after string) (prefix, oldMiddle, newMiddle, suffix string) {
+	beforeRunes, afterRunes := []rune(before), []rune(after)
+	prefixEnd := longestCommonPrefix(beforeRunes, afterRunes)
+	prefix = string(beforeRunes[:prefixEnd])
+	suffixEnd := longestCommonSuffix(beforeRunes[prefixEnd:], afterRunes[prefixEnd:])
+	suffix = string(beforeRunes[len(beforeRunes)-suffixEnd:])
+	oldMiddle, newMiddle = string(beforeRunes[prefixEnd:len(beforeRunes)-suffixEnd]), string(afterRunes[prefixEnd:len(afterRunes)-suffixEnd])
+	return prefix, oldMiddle, newMiddle, suffix
+}
+
+func longestCommonPrefix(a, b []rune) (endIndex int) {
+	lenA, lenB := len(a), len(b)
+	if lenA == 0 || lenB == 0 {
+		return 0
+	} else if lenA == 1 || lenB == 1 {
+		if a[0] == b[0] {
+			return 1
+		}
+		return 0
+	}
+	maxEnd := min(lenA, lenB)
+	mid := max(1, maxEnd/2)
+	aHalf, bHalf := a[:mid], b[:mid]
+	if slices.Equal(aHalf, bHalf) {
+		return mid + longestCommonPrefix(a[mid:], b[mid:])
+	} else {
+		return longestCommonPrefix(aHalf, bHalf)
+	}
+}
+
+func longestCommonSuffix(a, b []rune) (endIndex int) {
+	lenA, lenB := len(a), len(b)
+	if lenA == 0 || lenB == 0 {
+		return 0
+	} else if lenA == 1 || lenB == 1 {
+		if a[0] == b[0] {
+			return 1
+		}
+		return 0
+	}
+	maxEnd := min(lenA, lenB)
+	mid := max(1, maxEnd/2)
+	aOffset, bOffset := lenA-mid, lenB-mid
+	aHalf, bHalf := a[aOffset:], b[bOffset:]
+	if slices.Equal(aHalf, bHalf) {
+		return mid + longestCommonSuffix(a[:aOffset], b[:bOffset])
+	} else {
+		return longestCommonSuffix(aHalf, bHalf)
+	}
 }
 
 func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) error {

@@ -2,9 +2,11 @@ package au
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/automerge/automerge-go"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 )
@@ -88,6 +90,43 @@ func TestEditTodo_success(t *testing.T) {
 	assert.Equal(t, td2, td3)
 }
 
+func TestEditTodo_check_efficient_description(t *testing.T) {
+	s := newDirectoryStorage(t)
+	ws, _ := s.CreateWorkspace(context.Background(), CreateWorkspaceParams{Alias: "testing"})
+	wsp, _ := s.OpenWorkspace(context.Background(), ws.Id, true)
+	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
+		Title:       "Do the thing",
+		Description: "my original text.",
+	})
+	assert.NoError(t, err)
+
+	t.Run("changing one byte", func(t *testing.T) {
+		newDescription := "my original text!"
+		_, err = wsp.EditTodo(context.Background(), td.Id, EditTodoParams{
+			Description: &newDescription,
+		})
+		assert.NoError(t, err)
+		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
+			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
+			assert.Equal(t, "edited todo "+td.Id, c.Message())
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 157)
+		}
+	})
+
+	t.Run("changing all bytes", func(t *testing.T) {
+		newDescription := "MY ORIGINAL TEXT."
+		_, err = wsp.EditTodo(context.Background(), td.Id, EditTodoParams{
+			Description: &newDescription,
+		})
+		assert.NoError(t, err)
+		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
+			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
+			assert.Equal(t, "edited todo "+td.Id, c.Message())
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 191)
+		}
+	})
+}
+
 func TestDeleteTodo_missing(t *testing.T) {
 	s := newDirectoryStorage(t)
 	ws, _ := s.CreateWorkspace(context.Background(), CreateWorkspaceParams{Alias: "testing"})
@@ -108,5 +147,25 @@ func TestDeleteTodo_success(t *testing.T) {
 	if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 		c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
 		assert.Equal(t, "deleted todo "+td.Id, c.Message())
+	}
+}
+
+func TestStringBreak(t *testing.T) {
+	for _, tc := range []string{
+		"     ",
+		"a a a   ",
+		"ab ac a b c ",
+		"abc adc a b d c",
+		"ab abc ab  c ",
+		"one-two-three one-zero-three one- tw zer o-three",
+		"something   something  ",
+		" something   something ",
+		"one two  one two ",
+	} {
+		t.Run(tc, func(t *testing.T) {
+			parts := strings.Split(tc, " ")
+			a, b, c, d := stringBreak(parts[0], parts[1])
+			assert.Equal(t, []string{parts[2], parts[3], parts[4], parts[5]}, []string{a, b, c, d})
+		})
 	}
 }
