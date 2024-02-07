@@ -47,7 +47,10 @@ func TestCli_create_todos(t *testing.T) {
 	assert.Len(t, outSlice, 0)
 
 	buff.Reset()
-	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", "--title", "My todo", "--description", "Some longer description of the todo"}))
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{
+		"create", "--title", "My todo", "--description", "Some longer description of the todo",
+		"--annotation", "about:blank#example=42", "--annotation", "about:blank#another=something else",
+	}))
 	var outStruct map[string]interface{}
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
 	assert.NotNil(t, outStruct["created_at"].(time.Time))
@@ -56,11 +59,14 @@ func TestCli_create_todos(t *testing.T) {
 	_, err = ulid.Parse(todoId)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]interface{}{
-		"id":            todoId,
-		"title":         "My todo",
-		"description":   "Some longer description of the todo",
-		"status":        "open",
-		"annotations":   map[string]interface{}{},
+		"id":          todoId,
+		"title":       "My todo",
+		"description": "Some longer description of the todo",
+		"status":      "open",
+		"annotations": map[string]interface{}{
+			"about:blank#example": "42",
+			"about:blank#another": "something else",
+		},
 		"comment_count": 0,
 	}, outStruct)
 
@@ -76,16 +82,22 @@ func TestCli_create_todos(t *testing.T) {
 	assert.Equal(t, todoId, outStruct["id"].(string))
 
 	buff.Reset()
-	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"edit", "--title", "My todo 2", "--description", "Edited description", "--status", "closed", todoId}))
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{
+		"edit", "--title", "My todo 2", "--description", "Edited description", "--status", "closed", todoId,
+		"--annotation", "about:blank#example=", "--annotation", "about:blank#example2=13",
+	}))
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
 	assert.NotNil(t, outStruct["created_at"].(time.Time))
 	delete(outStruct, "created_at")
 	assert.Equal(t, map[string]interface{}{
-		"id":            todoId,
-		"title":         "My todo 2",
-		"description":   "Edited description",
-		"status":        "closed",
-		"annotations":   map[string]interface{}{},
+		"id":          todoId,
+		"title":       "My todo 2",
+		"description": "Edited description",
+		"status":      "closed",
+		"annotations": map[string]interface{}{
+			"about:blank#another":  "something else",
+			"about:blank#example2": "13",
+		},
 		"comment_count": 0,
 	}, outStruct)
 
