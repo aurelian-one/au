@@ -2,6 +2,7 @@ package todocmd
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -110,6 +111,22 @@ var createCommand = &cobra.Command{
 			params.Description = d
 		}
 
+		if v, err := cmd.Flags().GetStringArray("annotation"); err != nil {
+			return errors.Wrap(err, "failed to get annotations flag")
+		} else {
+			params.Annotations = make(map[string]string)
+			for _, entry := range v {
+				parts := strings.SplitN(entry, "=", 2)
+				if len(parts) == 1 {
+					return errors.Errorf("invalid annotation argument '%s', must end in = or =value", entry)
+				} else if parts[1] == "" {
+					return errors.New("cannot set an annotation to an empty string")
+				} else {
+					params.Annotations[parts[0]] = parts[1]
+				}
+			}
+		}
+
 		if todo, err := ws.CreateTodo(cmd.Context(), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
@@ -178,6 +195,20 @@ var editCommand = &cobra.Command{
 			params.Description = &d
 		}
 
+		if v, err := cmd.Flags().GetStringArray("annotation"); err != nil {
+			return errors.Wrap(err, "failed to get annotations flag")
+		} else {
+			params.Annotations = make(map[string]string)
+			for _, entry := range v {
+				parts := strings.SplitN(entry, "=", 2)
+				if len(parts) == 1 {
+					return errors.Errorf("invalid annotation argument '%s', must end in = or =value", entry)
+				} else {
+					params.Annotations[parts[0]] = parts[1]
+				}
+			}
+		}
+
 		if todo, err := ws.EditTodo(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
@@ -219,11 +250,13 @@ func init() {
 	createCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	createCommand.Flags().String("description", "", "Set the description of the Todo")
 	createCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
+	createCommand.Flags().StringArray("annotation", []string{}, "Set annotations")
 
 	editCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	editCommand.Flags().String("description", "", "Set the description of the Todo")
 	editCommand.Flags().String("status", "", "Set the status of the Todo")
 	editCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
+	editCommand.Flags().StringArray("annotation", []string{}, "Set or clear annotations")
 
 	Command.AddCommand(
 		getCommand,
