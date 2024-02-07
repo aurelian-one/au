@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"mime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -43,8 +44,8 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	}
 	output := new(Todo)
 	output.Id = id
-	if titleValue, _ := item.Map().Get("title"); titleValue.Kind() == automerge.KindStr {
-		output.Title = titleValue.Str()
+	if titleValue, _ := item.Map().Get("title"); titleValue.Kind() == automerge.KindText {
+		output.Title, _ = titleValue.Text().Get()
 	}
 	if statusValue, _ := item.Map().Get("status"); statusValue.Kind() == automerge.KindStr {
 		output.Status = statusValue.Str()
@@ -52,11 +53,7 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
 		output.CreatedAt = createdAtValue.Time().In(time.UTC)
 	}
-	descriptionValue, _ := item.Map().Get("description")
-	switch descriptionValue.Kind() {
-	case automerge.KindStr:
-		output.Description = descriptionValue.Str()
-	case automerge.KindText:
+	if descriptionValue, _ := item.Map().Get("description"); descriptionValue.Kind() == automerge.KindText {
 		output.Description, _ = descriptionValue.Text().Get()
 	}
 
@@ -139,7 +136,7 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	} else if err := newTodo.Set("created_at", createdAt); err != nil {
 		return nil, errors.Wrap(err, "failed to set created_at")
 	}
-	if err := newTodo.Set("title", params.Title); err != nil {
+	if err := newTodo.Set("title", automerge.NewText(params.Title)); err != nil {
 		return nil, errors.Wrap(err, "failed to set title")
 	}
 	if err := newTodo.Set("description", automerge.NewText(params.Description)); err != nil {
@@ -223,16 +220,16 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	}
 	todoValue, _ := p.Doc.Path("todos").Map().Get(id)
 	if params.Title != nil {
-		if err := todoValue.Map().Set("title", *params.Title); err != nil {
-			return nil, errors.Wrap(err, "failed to set title on existing todo")
+		existingTitleValue, _ := todoValue.Map().Get("title")
+		if td.Description, err = spliceTextNode(existingTitleValue.Text(), *params.Title); err != nil {
+			return nil, err
 		}
-		td.Title = *params.Title
 	}
 	if params.Description != nil {
-		if err := todoValue.Map().Set("description", *params.Description); err != nil {
-			return nil, errors.Wrap(err, "failed to set description on existing todo")
+		existingDescriptionValue, _ := todoValue.Map().Get("description")
+		if td.Description, err = spliceTextNode(existingDescriptionValue.Text(), *params.Description); err != nil {
+			return nil, err
 		}
-		td.Description = *params.Description
 	}
 	if params.Status != nil {
 		if err := todoValue.Map().Set("status", *params.Status); err != nil {
@@ -259,6 +256,66 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getTodoInner(todos, id)
+}
+
+func spliceTextNode(node *automerge.Text, newValue string) (string, error) {
+	existingStr, _ := node.Get()
+	commonPrefix, oldMiddle, newMiddle, _ := stringBreak(existingStr, newValue)
+	if err := node.Splice(len(commonPrefix), len(oldMiddle), newMiddle); err != nil {
+		return "", errors.Wrap(err, "failed to splice")
+	}
+	return node.Get()
+}
+
+func stringBreak(before, after string) (prefix, oldMiddle, newMiddle, suffix string) {
+	beforeRunes, afterRunes := []rune(before), []rune(after)
+	prefixEnd := longestCommonPrefix(beforeRunes, afterRunes)
+	prefix = string(beforeRunes[:prefixEnd])
+	suffixEnd := longestCommonSuffix(beforeRunes[prefixEnd:], afterRunes[prefixEnd:])
+	suffix = string(beforeRunes[len(beforeRunes)-suffixEnd:])
+	oldMiddle, newMiddle = string(beforeRunes[prefixEnd:len(beforeRunes)-suffixEnd]), string(afterRunes[prefixEnd:len(afterRunes)-suffixEnd])
+	return prefix, oldMiddle, newMiddle, suffix
+}
+
+func longestCommonPrefix(a, b []rune) (endIndex int) {
+	lenA, lenB := len(a), len(b)
+	if lenA == 0 || lenB == 0 {
+		return 0
+	} else if lenA == 1 || lenB == 1 {
+		if a[0] == b[0] {
+			return 1
+		}
+		return 0
+	}
+	maxEnd := min(lenA, lenB)
+	mid := max(1, maxEnd/2)
+	aHalf, bHalf := a[:mid], b[:mid]
+	if slices.Equal(aHalf, bHalf) {
+		return mid + longestCommonPrefix(a[mid:], b[mid:])
+	} else {
+		return longestCommonPrefix(aHalf, bHalf)
+	}
+}
+
+func longestCommonSuffix(a, b []rune) (endIndex int) {
+	lenA, lenB := len(a), len(b)
+	if lenA == 0 || lenB == 0 {
+		return 0
+	} else if lenA == 1 || lenB == 1 {
+		if a[0] == b[0] {
+			return 1
+		}
+		return 0
+	}
+	maxEnd := min(lenA, lenB)
+	mid := max(1, maxEnd/2)
+	aOffset, bOffset := lenA-mid, lenB-mid
+	aHalf, bHalf := a[aOffset:], b[bOffset:]
+	if slices.Equal(aHalf, bHalf) {
+		return mid + longestCommonSuffix(a[:aOffset], b[:bOffset])
+	} else {
+		return longestCommonSuffix(aHalf, bHalf)
+	}
 }
 
 func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) error {
