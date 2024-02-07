@@ -86,22 +86,20 @@ preventing todos from being set to `open` from `closed`.
 
 #### `annotations` - KindMap
 
-Annotations are used to support custom applications built on top of the Aurelian format or for tracking extensions that
-may not be fully defined yet.
+Annotations are used to support custom applications built on top of the Aurelian format. The annotation key should be a 
+uri that SHOULD point to a reference describing the annotation meaning.
 
-The annotation key should be a uri with SHOULD point to a reference describing the annotation meaning.
-
-Setting an annotation to an empty string should be equivalent to removing the annotation.
-
-Clients should enforce validation on adding or modifying annotations they understand and treat any other annotations as read-only.
+Setting an annotation to an empty string should be equivalent to removing the annotation. Clients should enforce 
+validation on adding or modifying annotations they understand and treat any other annotations as read-only.
 
 Examples of how annotations may be used:
 
-- Storing a human readable status reason along with the todo (eg: `https://aurelian.one/spec/annotations/status-open-reason: In Progress`)
-- Storing a machine-readable todo Rank (eg: `https://aurelian.one/spec/annotations/rank: 0`) to allow basic prioritisation of tasks
+- Storing a human readable status reason along with the todo (eg: `https://aurelian.one/annotations/status-open-reason: In Progress`)
+- Storing a machine-readable todo Rank (eg: `https://aurelian.one/annotations/rank: 0`) to allow basic prioritisation of tasks
+- Storing a url-encoded Label (eg: `https://aurelian.one/annotations/label#My%20Label: true`) to allow grouping and filtering of tasks
 - Hiding a todo until a target date/time (eg: `https//github.com/my-au-bot/hide-until: 2025-01-01`)
 
-Annotations should be used carefully.
+The `aurelian` and `aurelian.one` uri hosts are reserved for use by the Aurelian project at this time.
 
 #### `comments` - KindMap
 

@@ -67,5 +67,21 @@ func ValidateTodoAnnotationKey(key string) error {
 	if strings.TrimSpace(u.Scheme) == "" {
 		return errors.New("missing a uri scheme")
 	}
+	if u.Hostname() == "aurelian.one" {
+		// we control this schema and there are only particular valid values here
+		if u.Scheme != "https" {
+			return errors.Errorf("'%s' annotations require an https scheme", u.Hostname())
+		} else if u.User != nil {
+			return errors.Errorf("'%s' annotations cannot have user info", u.Hostname())
+		} else if u.Port() != "" {
+			return errors.Errorf("'%s' annotations cannot have a port", u.Hostname())
+		} else if u.RawQuery != "" {
+			return errors.Errorf("'%s' annotations cannot have a query string", u.Hostname())
+		} else if parts := strings.Split(u.Path, "/"); len(parts) != 3 || parts[1] != "annotations" || parts[2] == "" {
+			return errors.Errorf("'%s' annotation path must match /annotations/* pattern", u.Hostname())
+		}
+	} else if u.Hostname() == "aurelian" {
+		return errors.Errorf("'%s' annotation are reserved", u.Hostname())
+	}
 	return nil
 }
