@@ -17,6 +17,9 @@ type StorageProvider interface {
 	GetCurrentWorkspace(ctx context.Context) (string, error)
 	SetCurrentWorkspace(ctx context.Context, id string) error
 
+	GetCurrentAuthor(ctx context.Context) (string, error)
+	SetCurrentAuthor(ctx context.Context, author string) error
+
 	OpenWorkspace(ctx context.Context, id string, writeable bool) (WorkspaceProvider, error)
 }
 
@@ -25,10 +28,10 @@ type DocProvider interface {
 }
 
 type WorkspaceMeta struct {
-	Id        string
-	Alias     string
-	CreatedAt time.Time
-	SizeBytes int64
+	Id        string    `json:"id"`
+	Alias     string    `json:"alias"`
+	CreatedAt time.Time `json:"created_at"`
+	SizeBytes int64     `json:"size_bytes"`
 }
 
 type CreateWorkspaceParams struct {
@@ -55,7 +58,7 @@ type WorkspaceProvider interface {
 type Todo struct {
 	Id           string     `yaml:"id"`
 	CreatedAt    time.Time  `yaml:"created_at"`
-	CreatedBy    *string    `yaml:"created_by,omitempty"`
+	CreatedBy    string     `yaml:"created_by,omitempty"`
 	UpdatedAt    *time.Time `yaml:"updated_at,omitempty"`
 	UpdatedBy    *string    `yaml:"updated_by,omitempty"`
 	CommentCount int        `yaml:"comment_count"`
@@ -71,7 +74,7 @@ type CreateTodoParams struct {
 	Description string
 	Status      *string
 	Annotations map[string]string
-	CreatedBy   *string
+	CreatedBy   string
 }
 
 type EditTodoParams struct {
@@ -79,13 +82,13 @@ type EditTodoParams struct {
 	Description *string
 	Status      *string
 	Annotations map[string]string
-	UpdatedBy   *string
+	UpdatedBy   string
 }
 
 type Comment struct {
 	Id        string     `yaml:"id"`
 	CreatedAt time.Time  `yaml:"created_at"`
-	CreatedBy *string    `yaml:"created_by,omitempty"`
+	CreatedBy string     `yaml:"created_by,omitempty"`
 	UpdatedAt *time.Time `yaml:"updated_at,omitempty"`
 	UpdatedBy *string    `yaml:"updated_by,omitempty"`
 	MediaType string     `yaml:"media_type"`
@@ -95,10 +98,10 @@ type Comment struct {
 type CreateCommentParams struct {
 	MediaType string
 	Content   []byte
-	CreatedBy *string
+	CreatedBy string
 }
 
 type EditCommentParams struct {
 	Content   []byte
-	UpdatedBy *string
+	UpdatedBy string
 }

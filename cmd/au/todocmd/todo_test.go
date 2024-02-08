@@ -35,6 +35,7 @@ func TestCli_create_todos(t *testing.T) {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.StorageContextKey, s)
 	ctx = context.WithValue(ctx, common.CurrentWorkspaceIdContextKey, wsMeta.Id)
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example <email@me.com>")
 
 	buff := new(bytes.Buffer)
 	Command.SetOut(buff)
@@ -68,6 +69,7 @@ func TestCli_create_todos(t *testing.T) {
 			"about:blank#another": "something else",
 		},
 		"comment_count": 0,
+		"created_by":    "Example <email@me.com>",
 	}, outStruct)
 
 	buff.Reset()
@@ -101,6 +103,8 @@ func TestCli_create_todos(t *testing.T) {
 			"about:blank#example2": "13",
 		},
 		"comment_count": 0,
+		"created_by":    "Example <email@me.com>",
+		"updated_by":    "Example <email@me.com>",
 	}, outStruct)
 
 	buff.Reset()
@@ -122,6 +126,7 @@ func TestCli_list_ranking(t *testing.T) {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.StorageContextKey, s)
 	ctx = context.WithValue(ctx, common.CurrentWorkspaceIdContextKey, wsMeta.Id)
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example <email@me.com>")
 
 	buff := new(bytes.Buffer)
 	Command.SetOut(buff)
@@ -149,4 +154,40 @@ func TestCli_list_ranking(t *testing.T) {
 		titles = append(titles, todo["title"].(string))
 	}
 	assert.Equal(t, []string{"Todo 5", "Todo 2", "Todo 1"}, titles[:3])
+}
+
+func TestCli_todo_authors(t *testing.T) {
+	td, err := os.MkdirTemp(os.TempDir(), "au")
+	assert.NoError(t, err)
+
+	s, _ := au.NewDirectoryStorage(td)
+	wsMeta, err := s.CreateWorkspace(context.Background(), au.CreateWorkspaceParams{Alias: "Example"})
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.StorageContextKey, s)
+	ctx = context.WithValue(ctx, common.CurrentWorkspaceIdContextKey, wsMeta.Id)
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example <email@me.com>")
+
+	buff := new(bytes.Buffer)
+	Command.SetOut(buff)
+	Command.SetErr(buff)
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", "--title", "Todo 1", "--author", "Example <email@me.com>"}))
+	var outStruct map[string]interface{}
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	todoId := outStruct["id"].(string)
+	assert.Equal(t, "Example <email@me.com>", outStruct["created_by"])
+	assert.Nil(t, outStruct["updated_at"])
+	assert.Nil(t, outStruct["updated_by"])
+
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example2 <email@me.com>")
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"edit", todoId, "--title", "Todo 2", "--author", "Example2 <email@me.com>"}))
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	assert.Equal(t, "Example <email@me.com>", outStruct["created_by"])
+	assert.NotNil(t, outStruct["updated_at"])
+	assert.Equal(t, "Example2 <email@me.com>", outStruct["updated_by"])
 }

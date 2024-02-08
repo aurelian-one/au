@@ -138,6 +138,12 @@ var createCommand = &cobra.Command{
 			}
 		}
 
+		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
+			params.CreatedBy = v
+		} else {
+			return errors.New("no author set, please set one for the current workspace")
+		}
+
 		if todo, err := ws.CreateTodo(cmd.Context(), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
@@ -221,6 +227,12 @@ var editCommand = &cobra.Command{
 			}
 		}
 
+		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
+			params.UpdatedBy = v
+		} else {
+			return errors.New("no author set, please set one for the current workspace")
+		}
+
 		if todo, err := ws.EditTodo(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
@@ -263,13 +275,15 @@ func init() {
 	createCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	createCommand.Flags().String("description", "", "Set the description of the Todo")
 	createCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
-	createCommand.Flags().StringArray("annotation", []string{}, "Set an annotation using key=value synta")
+	createCommand.Flags().StringArray("annotation", []string{}, "Set an annotation using key=value syntax")
+	createCommand.Flags().String("author", "", "Set the author of the Todo as 'Name <email>'")
 
 	editCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	editCommand.Flags().String("description", "", "Set the description of the Todo")
 	editCommand.Flags().String("status", "", "Set the status of the Todo")
 	editCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
 	editCommand.Flags().StringArray("annotation", []string{}, "Set an annotation using key=value or clear an annotation using key=")
+	editCommand.Flags().String("author", "", "Set the author of the Todo update as 'Name <email>'")
 
 	Command.AddCommand(
 		getCommand,

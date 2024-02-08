@@ -104,7 +104,7 @@ func ValidateTodoAnnotationKey(key string) error {
 	return nil
 }
 
-var validAuthorPattern = regexp.MustCompile(`^\S+( \S+) <\S+@\S+>$`)
+var validAuthorPattern = regexp.MustCompile(`^\S+( \S+)* <\S+@\S+>$`)
 
 func ValidatedAuthor(input string) error {
 	if !validAuthorPattern.MatchString(input) {

@@ -150,6 +150,44 @@ func (d *directoryStorage) SetCurrentWorkspace(ctx context.Context, id string) e
 	return nil
 }
 
+func (d *directoryStorage) GetCurrentAuthor(ctx context.Context) (string, error) {
+	workspaceId, err := d.GetCurrentWorkspace(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if raw, err := os.ReadFile(filepath.Join(d.Path, workspaceId+".author")); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", errors.Wrap(err, "failed to read author")
+	} else {
+		return strings.TrimSpace(string(raw)), nil
+	}
+}
+
+func (d *directoryStorage) SetCurrentAuthor(ctx context.Context, author string) error {
+	if err := ValidatedAuthor(author); err != nil {
+		return err
+	}
+
+	workspaceId, err := d.GetCurrentWorkspace(ctx)
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(d.Path, workspaceId+".author")
+	tempPath := path + ".temp"
+
+	if err := os.WriteFile(tempPath, []byte(author), os.FileMode(0644)); err != nil {
+		return errors.Wrapf(err, "failed to write author")
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return errors.Wrap(err, "failed to rename author pointer")
+	}
+	return nil
+}
+
 func (d *directoryStorage) OpenWorkspace(ctx context.Context, id string, writeable bool) (WorkspaceProvider, error) {
 	path := filepath.Join(d.Path, id+Suffix)
 
