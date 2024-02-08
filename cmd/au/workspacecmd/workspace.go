@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 
 	"github.com/gorilla/websocket"
@@ -24,11 +25,19 @@ import (
 //go:generate go run github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen --config=oapi-codegen.cfg.yaml ../../../specification/openapi.yaml
 
 var Command = &cobra.Command{
-	Use: "workspace",
+	Use:     "workspace",
+	GroupID: "core",
+	Short:   "Create, read, update, and delete the Workspaces that contain Todos",
+	Long: strings.TrimSpace(`
+Workspaces are individual Aurelian documents that contain a set of Todos and all metadata needed to support them. Think of a workspace as one project or point of coordination.
+
+Workspaces are identified by a ULID and have a human-readable alias.
+`),
 }
 
 var initCommand = &cobra.Command{
 	Use:        "init <alias>",
+	Short:      "Create a new Workspace",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"alias"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -50,8 +59,9 @@ var initCommand = &cobra.Command{
 }
 
 var listCommand = &cobra.Command{
-	Use:  "list",
-	Args: cobra.NoArgs,
+	Use:   "list",
+	Short: "List all of the Workspaces",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		metadataList, err := s.ListWorkspaces(cmd.Context())
@@ -65,8 +75,9 @@ var listCommand = &cobra.Command{
 }
 
 var getCommand = &cobra.Command{
-	Use:  "get",
-	Args: cobra.NoArgs,
+	Use:   "get",
+	Short: "Get the details of the current Workspace",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
@@ -85,6 +96,7 @@ var getCommand = &cobra.Command{
 
 var useCommand = &cobra.Command{
 	Use:        "use <uid>",
+	Short:      "Set the current Workspace",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -104,6 +116,7 @@ var useCommand = &cobra.Command{
 
 var deleteCommand = &cobra.Command{
 	Use:        "delete <uid>",
+	Short:      "Delete a Workspace",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"uid"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -128,6 +141,7 @@ var deleteCommand = &cobra.Command{
 
 var syncServerCommand = &cobra.Command{
 	Use:        "serve <localhost:80>",
+	Short:      "Start a local webserver serving all Workspaces",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"address"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -160,6 +174,7 @@ var syncServerCommand = &cobra.Command{
 
 var syncClientCommand = &cobra.Command{
 	Use:        "sync <http://localhost:80>",
+	Short:      "Synchronise the current Workspace against a remote server",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"address"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -207,6 +222,7 @@ var syncClientCommand = &cobra.Command{
 
 var syncImportCommand = &cobra.Command{
 	Use:        "sync-import <http://localhost:80>",
+	Short:      "Import a Workspace from a remote server",
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"address", "id"},
 	RunE: func(cmd *cobra.Command, args []string) error {

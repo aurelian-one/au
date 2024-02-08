@@ -12,11 +12,15 @@ import (
 )
 
 var Command = &cobra.Command{
-	Use: "comment",
+	Use:     "comment",
+	GroupID: "core",
+	Short:   "Create, read, update, and delete comments on the Todos",
+	Long:    "Each Todo may have a list of comments associated with it. Comments contain annotations, a log of work, attached images or files.",
 }
 
 var getCommand = &cobra.Command{
 	Use:        "get <todo-id> <comment-id>",
+	Short:      "Get a particular Comment from a Todo by id",
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"todo-id", "comment-id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,6 +47,7 @@ var getCommand = &cobra.Command{
 
 var listCommand = &cobra.Command{
 	Use:        "list <todo-id>",
+	Short:      "List Comments on the Todo by id",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"todo-id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -73,6 +78,7 @@ var listCommand = &cobra.Command{
 
 var createCommand = &cobra.Command{
 	Use:        "create <todo-id>",
+	Short:      "Create Comment on the given Todo",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"todo-id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -124,6 +130,7 @@ var createCommand = &cobra.Command{
 
 var editCommand = &cobra.Command{
 	Use:        "edit <todo-id> <comment-id>",
+	Short:      "Edit a Comment on a Todo",
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"todo-id", "comment-id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -182,6 +189,7 @@ var editCommand = &cobra.Command{
 
 var deleteCommand = &cobra.Command{
 	Use:        "delete <todo-id> <comment-id>",
+	Short:      "Delete a Comment from a Todo",
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"todo-id", "comment-id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
