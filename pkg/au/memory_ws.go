@@ -5,13 +5,14 @@ import (
 	"encoding/base64"
 	"mime"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/automerge/automerge-go"
 	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
+
+	"github.com/aurelian-one/au/internal"
 )
 
 type inMemoryWorkspaceProvider struct {
@@ -52,6 +53,15 @@ func getTodoInner(todos *automerge.Map, id string) (*Todo, error) {
 	}
 	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
 		output.CreatedAt = createdAtValue.Time().In(time.UTC)
+	}
+	if createdByValue, _ := item.Map().Get("created_by"); createdByValue.Kind() == automerge.KindStr {
+		output.CreatedBy = internal.Ref(createdByValue.Str())
+	}
+	if updatedAtValue, _ := item.Map().Get("updated_at"); updatedAtValue.Kind() == automerge.KindTime {
+		output.UpdatedAt = internal.Ref(updatedAtValue.Time().In(time.UTC))
+	}
+	if updatedByValue, _ := item.Map().Get("updated_by"); updatedByValue.Kind() == automerge.KindStr {
+		output.UpdatedBy = internal.Ref(updatedByValue.Str())
 	}
 	if descriptionValue, _ := item.Map().Get("description"); descriptionValue.Kind() == automerge.KindText {
 		output.Description, _ = descriptionValue.Text().Get()
@@ -96,6 +106,11 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	params.Description, err = ValidateTodoDescription(params.Description)
 	if err != nil {
 		return nil, err
+	}
+	if params.CreatedBy != nil {
+		if err := ValidatedAuthor(*params.CreatedBy); err != nil {
+			return nil, err
+		}
 	}
 
 	status := "open"
@@ -142,6 +157,11 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 	if err := newTodo.Set("description", automerge.NewText(params.Description)); err != nil {
 		return nil, errors.Wrap(err, "failed to set description")
 	}
+	if params.CreatedBy != nil {
+		if err := newTodo.Set("created_by", *params.CreatedBy); err != nil {
+			return nil, errors.Wrap(err, "failed to set created_by")
+		}
+	}
 
 	newAnnotations := automerge.NewMap()
 	_ = newTodo.Set("annotations", newAnnotations)
@@ -177,26 +197,9 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		}
 		params.Status = &o
 	}
-
-	if params.Title != nil {
-		if pt, err := ValidateAndCleanUnicode(*params.Title, false); err != nil {
-			return nil, errors.Wrap(err, "invalid title")
-		} else if pt, d := strings.TrimSpace(pt), MinimumTodoTitleLength; len(pt) < d {
-			return nil, errors.Errorf("title is too short, it should be at least %d characters", d)
-		} else if d := MaximumTodoTitleLength; len(pt) > d {
-			return nil, errors.Errorf("title is too long, it should be at most %d characters", d)
-		} else {
-			params.Title = &pt
-		}
-	}
-
-	if params.Description != nil {
-		if pt, err := ValidateAndCleanUnicode(*params.Description, true); err != nil {
-			return nil, errors.Wrap(err, "invalid description")
-		} else if d := MaximumDescriptionLength; len(pt) > d {
-			return nil, errors.Errorf("description is too long, it should be at most %d characters", d)
-		} else {
-			params.Description = &pt
+	if params.UpdatedBy != nil {
+		if err := ValidatedAuthor(*params.UpdatedBy); err != nil {
+			return nil, err
 		}
 	}
 
@@ -250,6 +253,11 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		} else {
 			_ = annotationsValue.Map().Set(k, v)
 		}
+	}
+
+	updatedAt := time.Now().UTC().Truncate(time.Second)
+	if err := todoValue.Map().Set("updated_at", updatedAt); err != nil {
+		return nil, errors.Wrap(err, "failed to set updated_at")
 	}
 
 	if _, err := p.Doc.Commit("edited todo " + id); err != nil {
@@ -389,6 +397,15 @@ func getCommentInner(comments *automerge.Map, id string) (*Comment, error) {
 	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
 		output.CreatedAt = createdAtValue.Time().In(time.UTC)
 	}
+	if createdByValue, _ := item.Map().Get("created_by"); createdByValue.Kind() == automerge.KindStr {
+		output.CreatedBy = internal.Ref(createdByValue.Str())
+	}
+	if updatedAtValue, _ := item.Map().Get("updated_at"); updatedAtValue.Kind() == automerge.KindTime {
+		output.UpdatedAt = internal.Ref(updatedAtValue.Time().In(time.UTC))
+	}
+	if updatedByValue, _ := item.Map().Get("updated_by"); updatedByValue.Kind() == automerge.KindStr {
+		output.UpdatedBy = internal.Ref(updatedByValue.Str())
+	}
 	return output, nil
 }
 
@@ -430,6 +447,12 @@ func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId st
 		return nil, errors.New("content is empty")
 	}
 
+	if params.CreatedBy != nil {
+		if err := ValidatedAuthor(*params.CreatedBy); err != nil {
+			return nil, err
+		}
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
@@ -462,6 +485,11 @@ func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId st
 	} else if err := newComment.Set("content", params.Content); err != nil {
 		return nil, errors.Wrap(err, "failed to set content")
 	}
+	if params.CreatedBy != nil {
+		if err := newComment.Set("created_by", *params.CreatedBy); err != nil {
+			return nil, errors.Wrap(err, "failed to set created_by")
+		}
+	}
 
 	if _, err := p.Doc.Commit("created comment " + newCommentId + " in todo " + todoId); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
@@ -470,6 +498,12 @@ func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId st
 }
 
 func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, commentId string, params EditCommentParams) (*Comment, error) {
+	if params.UpdatedBy != nil {
+		if err := ValidatedAuthor(*params.UpdatedBy); err != nil {
+			return nil, err
+		}
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
@@ -517,6 +551,11 @@ func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, com
 
 	if err = commentValue.Map().Set("content", params.Content); err != nil {
 		return nil, errors.Wrap(err, "failed to set content")
+	}
+
+	updatedAt := time.Now().UTC().Truncate(time.Second)
+	if err := commentValue.Map().Set("updated_at", updatedAt); err != nil {
+		return nil, errors.Wrap(err, "failed to set updated_at")
 	}
 
 	if _, err := p.Doc.Commit("edited comment " + commentId + " in todo " + todoId); err != nil {

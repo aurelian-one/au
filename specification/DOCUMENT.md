@@ -78,6 +78,14 @@ The contents should be valid multi-line UTF-8 according to section 3.1 in this d
 
 The time the Todo was created. Usually not editable.
 
+#### `created_by` - KindStr
+
+The author of the Todo. As a "Username <email>" string.
+
+#### `updated_by` - KindStr
+
+The last author of the Todo. As a "Username <email>" string.
+
 #### `status` - KindStr
 
 The required status of the todo. The status is either `open` or `closed`. All todos default to `open`. `closed` should be
@@ -115,6 +123,10 @@ Each comment has the format:
 #### `created_at` - KindTime
 
 The time the Comment was created. Usually not editable.
+
+#### `created_by` - KindStr
+
+The author of the Comment. As a "Username <email>" string.
 
 #### `media_type` - KindStr
 

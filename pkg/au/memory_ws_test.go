@@ -149,7 +149,7 @@ func TestEditTodo_check_efficient_description(t *testing.T) {
 		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
 			assert.Equal(t, "edited todo "+td.Id, c.Message())
-			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 157)
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 189)
 		}
 	})
 

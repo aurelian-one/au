@@ -89,6 +89,8 @@ func TestCli_create_todos(t *testing.T) {
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
 	assert.NotNil(t, outStruct["created_at"].(time.Time))
 	delete(outStruct, "created_at")
+	assert.NotNil(t, outStruct["updated_at"].(time.Time))
+	delete(outStruct, "updated_at")
 	assert.Equal(t, map[string]interface{}{
 		"id":          todoId,
 		"title":       "My todo 2",

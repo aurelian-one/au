@@ -53,14 +53,17 @@ type WorkspaceProvider interface {
 }
 
 type Todo struct {
-	Id           string    `yaml:"id"`
-	CreatedAt    time.Time `yaml:"created_at"`
-	CommentCount int       `yaml:"comment_count"`
+	Id           string     `yaml:"id"`
+	CreatedAt    time.Time  `yaml:"created_at"`
+	CreatedBy    *string    `yaml:"created_by,omitempty"`
+	UpdatedAt    *time.Time `yaml:"updated_at,omitempty"`
+	UpdatedBy    *string    `yaml:"updated_by,omitempty"`
+	CommentCount int        `yaml:"comment_count"`
 
 	Title       string            `yaml:"title"`
-	Description string            `yaml:"description"`
+	Description string            `yaml:"description,omitempty"`
 	Status      string            `yaml:"status"`
-	Annotations map[string]string `yaml:"annotations"`
+	Annotations map[string]string `yaml:"annotations,omitempty"`
 }
 
 type CreateTodoParams struct {
@@ -68,6 +71,7 @@ type CreateTodoParams struct {
 	Description string
 	Status      *string
 	Annotations map[string]string
+	CreatedBy   *string
 }
 
 type EditTodoParams struct {
@@ -75,20 +79,26 @@ type EditTodoParams struct {
 	Description *string
 	Status      *string
 	Annotations map[string]string
+	UpdatedBy   *string
 }
 
 type Comment struct {
-	Id        string
-	CreatedAt time.Time
-	MediaType string
-	Content   string
+	Id        string     `yaml:"id"`
+	CreatedAt time.Time  `yaml:"created_at"`
+	CreatedBy *string    `yaml:"created_by,omitempty"`
+	UpdatedAt *time.Time `yaml:"updated_at,omitempty"`
+	UpdatedBy *string    `yaml:"updated_by,omitempty"`
+	MediaType string     `yaml:"media_type"`
+	Content   string     `yaml:"content"`
 }
 
 type CreateCommentParams struct {
 	MediaType string
 	Content   []byte
+	CreatedBy *string
 }
 
 type EditCommentParams struct {
-	Content []byte
+	Content   []byte
+	UpdatedBy *string
 }
