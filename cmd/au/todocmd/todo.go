@@ -14,12 +14,15 @@ import (
 )
 
 var Command = &cobra.Command{
-	Use: "todo",
+	Use:     "todo",
+	GroupID: "core",
+	Short:   "Create, read, update, and delete Todos",
 }
 
 var getCommand = &cobra.Command{
-	Use:  "get <uid>",
-	Args: cobra.ExactArgs(1),
+	Use:   "get <id>",
+	Short: "Get a Todo by id",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
@@ -44,8 +47,9 @@ var getCommand = &cobra.Command{
 }
 
 var listCommand = &cobra.Command{
-	Use:  "list",
-	Args: cobra.NoArgs,
+	Use:   "list",
+	Short: "List all Todos",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
@@ -78,8 +82,9 @@ var listCommand = &cobra.Command{
 }
 
 var createCommand = &cobra.Command{
-	Use:  "create",
-	Args: cobra.NoArgs,
+	Use:   "create",
+	Short: "Create a new Todo",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
@@ -146,9 +151,10 @@ var createCommand = &cobra.Command{
 }
 
 var editCommand = &cobra.Command{
-	Use:        "edit <uid>",
+	Use:        "edit <id>",
+	Short:      "Edit a Todo by id",
 	Args:       cobra.ExactArgs(1),
-	ArgAliases: []string{"uid"},
+	ArgAliases: []string{"id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
@@ -228,9 +234,10 @@ var editCommand = &cobra.Command{
 }
 
 var deleteCommand = &cobra.Command{
-	Use:        "delete <uid>",
+	Use:        "delete <id>",
+	Short:      "Delete a Todo by id",
 	Args:       cobra.ExactArgs(1),
-	ArgAliases: []string{"uid"},
+	ArgAliases: []string{"id"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
 		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
@@ -256,13 +263,13 @@ func init() {
 	createCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	createCommand.Flags().String("description", "", "Set the description of the Todo")
 	createCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
-	createCommand.Flags().StringArray("annotation", []string{}, "Set annotations")
+	createCommand.Flags().StringArray("annotation", []string{}, "Set an annotation using key=value synta")
 
 	editCommand.Flags().StringP("title", "t", "", "Set the title of the Todo")
 	editCommand.Flags().String("description", "", "Set the description of the Todo")
 	editCommand.Flags().String("status", "", "Set the status of the Todo")
 	editCommand.Flags().Bool("edit", false, "Edit the title and description using AU_EDITOR")
-	editCommand.Flags().StringArray("annotation", []string{}, "Set or clear annotations")
+	editCommand.Flags().StringArray("annotation", []string{}, "Set an annotation using key=value or clear an annotation using key=")
 
 	Command.AddCommand(
 		getCommand,

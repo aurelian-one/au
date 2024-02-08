@@ -21,40 +21,15 @@ import (
 	"github.com/aurelian-one/au/pkg/au"
 )
 
-// Tree
-//
-// au init [alias] [flags..] --as=    - ensures the file tree exists and creates a new doc with a new uuid associated with it as well as the alias.
-//
-// au default [alias/id] --as=         - sets the given id to the default (this can be override by env var)
-//
-// au create "Do the thing" --description= --status= --output= --label=x=y
-//
-// au comment <number> --content-type= --content=foo --edit (open the content in $EDITOR and then save that in the comment)
-//
-// au list [flags] --output [filters]      - list items
-//
-// au get <number/title> --output
-//
-// au edit <number> --status --description ....   - patch aspects of the ticket --edit (open the title followed by --- and description in $EDITOR)
-//
-// au sync server                 - listen and wait for a peer to sync with
-//
-// au sync client                 - connect to address and sync and exit when complete
-//
-// au dev dump                  - dump the entire contents to json
-//
-// au dev import [alias]        - import content produced by dump and build a new document with it
-//
-// au dev merge --file
-//
-// one thing to work out is how we do locking of the au file :thinking: looks like most folks go with https://github.com/gofrs/flock
-
 var rootCmd = &cobra.Command{
 	Use:   "au",
 	Short: "au is the core CLI for interacting with aurelian task management",
-	Long: `A core CLI for interacting with aurelian task management workspaces manually in single-operation mode.
-This CLI can be used for simple human tasks or be called by other processes in order to accomplish machine-driven
-goals 🤖. Development and debug commands are also provided.`,
+	Long: strings.TrimSpace(`
+A core CLI for interacting with aurelian task management workspaces manually in single-operation mode.
+
+This CLI can be used for simple human tasks or be called by other processes in order to accomplish machine-driven goals 🤖. Development and debug commands are also provided.
+
+Find more information at: https://github.com/aurelian-one/au`),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := setupLogger(cmd); err != nil {
 			return err
@@ -69,8 +44,9 @@ goals 🤖. Development and debug commands are also provided.`,
 }
 
 var versionCmd = &cobra.Command{
-	Use:  "version",
-	Args: cobra.NoArgs,
+	Use:   "version",
+	Short: "Print the version information of the au binary",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		intTimestamp, _ := strconv.Atoi(au.CommitTimestamp)
 		_, _ = fmt.Fprintf(os.Stdout, "%s (%s @ %s)\n", au.Version, au.Commit, time.Unix(int64(intTimestamp), 0))
@@ -140,16 +116,19 @@ func init() {
 	rootCmd.PersistentFlags().String(
 		"directory", "",
 		strings.TrimSpace(fmt.Sprintf(`
-The path of the config directory to operate in. If no value is provided, this will fallback to $%s before 
-falling back to %s".`, au.ConfigDirEnvironmentVariable, au.DefaultConfigDir)),
+The path of the config directory to operate in. If no value is provided, this will fallback to $%s before falling back to %s".`,
+			au.ConfigDirEnvironmentVariable, au.DefaultConfigDir,
+		)),
 	)
 	rootCmd.PersistentFlags().String(
 		"current-workspace", "",
 		strings.TrimSpace(fmt.Sprintf(`
-The uid of the target workspace to operate in. If no value is provided, this will fallback to $%s before 
-falling back to current symlink".`, au.WorkspaceUidEnvironmentVariable)),
+The uid of the target workspace to operate in. If no value is provided, this will fallback to $%s before falling back to 'current' file".`,
+			au.WorkspaceUidEnvironmentVariable,
+		)),
 	)
 
+	rootCmd.AddGroup(&cobra.Group{Title: "Core", ID: "core"})
 	rootCmd.AddCommand(
 		workspacecmd.Command,
 		todocmd.Command,

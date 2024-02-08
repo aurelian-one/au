@@ -17,7 +17,8 @@ import (
 )
 
 var Command = &cobra.Command{
-	Use: "dev",
+	Use:   "dev",
+	Short: "Render advanced development views of the active Workspace",
 }
 
 var dumpCommand = &cobra.Command{
