@@ -2,6 +2,7 @@ package au
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -99,6 +100,15 @@ func ValidateTodoAnnotationKey(key string) error {
 
 	} else if u.Hostname() == ReservedAnnotationShortHostname {
 		return errors.Errorf("'%s' annotation are reserved", u.Hostname())
+	}
+	return nil
+}
+
+var validAuthorPattern = regexp.MustCompile(`^\S+( \S+)* <\S+@\S+>$`)
+
+func ValidatedAuthor(input string) error {
+	if !validAuthorPattern.MatchString(input) {
+		return errors.New("invalid author string, expected 'Name <email>'")
 	}
 	return nil
 }

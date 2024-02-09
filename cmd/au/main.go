@@ -34,7 +34,7 @@ Find more information at: https://github.com/aurelian-one/au`),
 		if err := setupLogger(cmd); err != nil {
 			return err
 		}
-		if err := resolveConfigDirectoryAndWorkspace(cmd, "directory", "current-workspace"); err != nil {
+		if err := resolveConfigDirectoryAndWorkspace(cmd, "directory", "current-workspace", "author"); err != nil {
 			return err
 		}
 		return nil
@@ -74,7 +74,7 @@ func setupLogger(cmd *cobra.Command) error {
 	return nil
 }
 
-func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string, workspaceFlag string) error {
+func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string, workspaceFlag string, authorFlag string) error {
 	directoryValue, err := cmd.Flags().GetString(directoryFlag)
 	if err != nil {
 		return err
@@ -102,8 +102,21 @@ func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string
 			workspaceValue = r
 		}
 	}
+
+	authorValue, _ := cmd.Flags().GetString(authorFlag)
+	currentAuthor, err := au.ResolveAuthor(authorValue)
+	if err != nil {
+		return err
+	}
+	if currentAuthor == "" && workspaceValue != "" {
+		if currentAuthor, err = directoryStorage.GetCurrentAuthor(cmd.Context()); err != nil {
+			return err
+		}
+	}
+
 	cmd.SetContext(context.WithValue(cmd.Context(), common.StorageContextKey, directoryStorage))
 	cmd.SetContext(context.WithValue(cmd.Context(), common.CurrentWorkspaceIdContextKey, workspaceValue))
+	cmd.SetContext(context.WithValue(cmd.Context(), common.CurrentAuthorContextKey, currentAuthor))
 	return nil
 }
 
@@ -123,8 +136,15 @@ The path of the config directory to operate in. If no value is provided, this wi
 	rootCmd.PersistentFlags().String(
 		"current-workspace", "",
 		strings.TrimSpace(fmt.Sprintf(`
-The uid of the target workspace to operate in. If no value is provided, this will fallback to $%s before falling back to 'current' file".`,
+The id of the target workspace to operate in. If no value is provided, this will fallback to $%s before falling back to 'current' file".`,
 			au.WorkspaceUidEnvironmentVariable,
+		)),
+	)
+	rootCmd.PersistentFlags().String(
+		"current-author", "",
+		strings.TrimSpace(fmt.Sprintf(`
+The 'Name <email>' of the author for any Todo or Comment changes. If no value is provided, this will fallback to $%s before falling back to 'author' file".`,
+			au.AuthorEnvironmentVariable,
 		)),
 	)
 

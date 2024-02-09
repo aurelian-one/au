@@ -11,6 +11,7 @@ import (
 const (
 	ConfigDirEnvironmentVariable    = "AU_DIRECTORY"
 	WorkspaceUidEnvironmentVariable = "AU_WORKSPACE"
+	AuthorEnvironmentVariable       = "AU_AUTHOR"
 	EditorVariable                  = "AU_EDITOR"
 	GlobalEditorVariable            = "EDITOR"
 	DefaultConfigDir                = "$HOME/.au"
@@ -43,5 +44,13 @@ func ResolveWorkspaceUid(flagValue string) (string, error) {
 		slog.Debug("no workspace uid provided on the cli - falling back to $" + WorkspaceUidEnvironmentVariable)
 		flagValue = os.Getenv(WorkspaceUidEnvironmentVariable)
 	}
-	return "", nil
+	return flagValue, nil
+}
+
+func ResolveAuthor(flagValue string) (string, error) {
+	if flagValue == "" {
+		slog.Debug("no author provided on the cli - falling back to $" + AuthorEnvironmentVariable)
+		flagValue = os.Getenv(AuthorEnvironmentVariable)
+	}
+	return flagValue, nil
 }

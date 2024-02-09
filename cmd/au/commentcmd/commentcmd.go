@@ -116,6 +116,10 @@ var createCommand = &cobra.Command{
 			params.Content = []byte(after)
 		}
 
+		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
+			params.CreatedBy = v
+		}
+
 		if todo, err := ws.CreateComment(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
@@ -159,6 +163,10 @@ var editCommand = &cobra.Command{
 			return errors.Wrap(err, "failed to get markdown content flag")
 		} else if v != "" {
 			params.Content = []byte(v)
+		}
+
+		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
+			params.UpdatedBy = v
 		}
 
 		if v, err := cmd.Flags().GetBool("edit"); err != nil {

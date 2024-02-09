@@ -33,9 +33,9 @@ func TestCommand(t *testing.T) {
 	{
 		openWs, err := s.OpenWorkspace(context.Background(), wsMeta.Id, true)
 		assert.NoError(t, err)
-		todo, err := openWs.CreateTodo(context.Background(), au.CreateTodoParams{Title: "something"})
-		todoId = todo.Id
+		todo, err := openWs.CreateTodo(context.Background(), au.CreateTodoParams{Title: "something", CreatedBy: "Example <name@me.com>"})
 		assert.NoError(t, err)
+		todoId = todo.Id
 		assert.NoError(t, openWs.Flush())
 		assert.NoError(t, openWs.Close())
 	}
@@ -43,6 +43,7 @@ func TestCommand(t *testing.T) {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.StorageContextKey, s)
 	ctx = context.WithValue(ctx, common.CurrentWorkspaceIdContextKey, wsMeta.Id)
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example <email@me.com>")
 
 	buff := new(bytes.Buffer)
 	Command.SetOut(buff)
@@ -127,4 +128,51 @@ func TestCommand(t *testing.T) {
 		})
 	})
 
+}
+
+func TestCli_todo_authors(t *testing.T) {
+	td, err := os.MkdirTemp(os.TempDir(), "au")
+	assert.NoError(t, err)
+
+	s, _ := au.NewDirectoryStorage(td)
+	wsMeta, err := s.CreateWorkspace(context.Background(), au.CreateWorkspaceParams{Alias: "Example"})
+	assert.NoError(t, err)
+
+	var todoId string
+	{
+		openWs, err := s.OpenWorkspace(context.Background(), wsMeta.Id, true)
+		assert.NoError(t, err)
+		todo, err := openWs.CreateTodo(context.Background(), au.CreateTodoParams{Title: "something", CreatedBy: "Example <email@me.com>"})
+		assert.NoError(t, err)
+		todoId = todo.Id
+		assert.NoError(t, openWs.Flush())
+		assert.NoError(t, openWs.Close())
+	}
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.StorageContextKey, s)
+	ctx = context.WithValue(ctx, common.CurrentWorkspaceIdContextKey, wsMeta.Id)
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example <email@me.com>")
+
+	buff := new(bytes.Buffer)
+	Command.SetOut(buff)
+	Command.SetErr(buff)
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", todoId, "--markdown", "Comment 1"}))
+	var outStruct map[string]interface{}
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	commentId := outStruct["id"].(string)
+	assert.Equal(t, "Example <email@me.com>", outStruct["created_by"])
+	assert.Nil(t, outStruct["updated_at"])
+	assert.Nil(t, outStruct["updated_by"])
+
+	ctx = context.WithValue(ctx, common.CurrentAuthorContextKey, "Example2 <email@me.com>")
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"edit", todoId, commentId, "--markdown", "Comment 2"}))
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	assert.Equal(t, "Example <email@me.com>", outStruct["created_by"])
+	assert.NotNil(t, outStruct["updated_at"])
+	assert.Equal(t, "Example2 <email@me.com>", outStruct["updated_by"])
 }

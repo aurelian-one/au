@@ -221,7 +221,7 @@ var syncClientCommand = &cobra.Command{
 }
 
 var syncImportCommand = &cobra.Command{
-	Use:        "sync-import <http://localhost:80>",
+	Use:        "sync-import <http://localhost:80> <id>",
 	Short:      "Import a Workspace from a remote server",
 	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"address", "id"},
@@ -257,6 +257,44 @@ var syncImportCommand = &cobra.Command{
 	},
 }
 
+var authorSetCommand = &cobra.Command{
+	Use:        "set-author <Name <email>>",
+	Short:      "Set the default author for Todos and Comments",
+	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"input"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		if err := au.ValidatedAuthor(cmd.Flags().Arg(0)); err != nil {
+			return err
+		}
+		return s.SetCurrentAuthor(cmd.Context(), cmd.Flags().Arg(0))
+	},
+}
+
+var authorGetCommand = &cobra.Command{
+	Use:   "get-author",
+	Short: "Get the default author for Todos and Comments",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
+		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
+		if w == "" {
+			return errors.New("current workspace not set")
+		}
+		if a, err := s.GetCurrentAuthor(cmd.Context()); err != nil {
+			return err
+		} else if a == "" {
+			return errors.New("default author not set")
+		} else {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), a)
+			return nil
+		}
+	},
+}
+
 func init() {
 	Command.AddCommand(
 		initCommand,
@@ -267,6 +305,8 @@ func init() {
 		syncServerCommand,
 		syncClientCommand,
 		syncImportCommand,
+		authorSetCommand,
+		authorGetCommand,
 	)
 }
 

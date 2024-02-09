@@ -38,6 +38,7 @@ func TestCreateTodo_success(t *testing.T) {
 		Annotations: map[string]string{
 			"https://aurelian-one/spec#some-annotation": "something",
 		},
+		CreatedBy: "Example <email@me.com>",
 	})
 	assert.NoError(t, err)
 	_, err = ulid.Parse(td.Id)
@@ -89,6 +90,7 @@ func TestCreateTodo_invalid_annotations(t *testing.T) {
 				Annotations: map[string]string{
 					tc.Key: tc.Value,
 				},
+				CreatedBy: "Example <email@me.com>",
 			})
 			if tc.ExpectedError != "" {
 				assert.EqualError(t, err, tc.ExpectedError)
@@ -106,6 +108,7 @@ func TestEditTodo_success(t *testing.T) {
 	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
 		Title:       "Do the thing",
 		Description: "Much longer text about doing the thing",
+		CreatedBy:   "Example <email@me.com>",
 	})
 	assert.NoError(t, err)
 	newTitle, newDescription, newStatus := "Do the other thing", "Short description", "closed"
@@ -113,6 +116,7 @@ func TestEditTodo_success(t *testing.T) {
 		Title:       &newTitle,
 		Description: &newDescription,
 		Status:      &newStatus,
+		UpdatedBy:   "Example <email@me.com>",
 	})
 	assert.NoError(t, err)
 	if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
@@ -137,13 +141,27 @@ func TestEditTodo_check_efficient_description(t *testing.T) {
 	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
 		Title:       "Do the thing",
 		Description: "my original text.",
+		CreatedBy:   "Example <email@me.com>",
 	})
 	assert.NoError(t, err)
+
+	t.Run("empty update", func(t *testing.T) {
+		_, err = wsp.EditTodo(context.Background(), td.Id, EditTodoParams{
+			UpdatedBy: "Example <email@me.com>",
+		})
+		assert.NoError(t, err)
+		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
+			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
+			assert.Equal(t, "edited todo "+td.Id, c.Message())
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 190)
+		}
+	})
 
 	t.Run("changing one byte", func(t *testing.T) {
 		newDescription := "my original text!"
 		_, err = wsp.EditTodo(context.Background(), td.Id, EditTodoParams{
 			Description: &newDescription,
+			UpdatedBy:   "Example <email@me.com>",
 		})
 		assert.NoError(t, err)
 		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
@@ -157,6 +175,7 @@ func TestEditTodo_check_efficient_description(t *testing.T) {
 		newDescription := "MY ORIGINAL TEXT."
 		_, err = wsp.EditTodo(context.Background(), td.Id, EditTodoParams{
 			Description: &newDescription,
+			UpdatedBy:   "Example <email@me.com>",
 		})
 		assert.NoError(t, err)
 		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
@@ -181,6 +200,7 @@ func TestDeleteTodo_success(t *testing.T) {
 	td, err := wsp.CreateTodo(context.Background(), CreateTodoParams{
 		Title:       "Do the thing",
 		Description: "Much longer text about doing the thing",
+		CreatedBy:   "Example <email@me.com>",
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, wsp.DeleteTodo(context.Background(), td.Id))
