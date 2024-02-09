@@ -28,10 +28,10 @@ type DocProvider interface {
 }
 
 type WorkspaceMeta struct {
-	Id        string    `json:"id"`
-	Alias     string    `json:"alias"`
-	CreatedAt time.Time `json:"created_at"`
-	SizeBytes int64     `json:"size_bytes"`
+	Id        string    `yaml:"id"`
+	Alias     string    `yaml:"alias"`
+	CreatedAt time.Time `yaml:"created_at"`
+	SizeBytes int64     `yaml:"size_bytes"`
 }
 
 type CreateWorkspaceParams struct {
