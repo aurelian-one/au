@@ -219,7 +219,10 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	if err != nil {
 		return nil, err
 	}
-	todoValue, _ := p.Doc.Path("todos").Map().Get(id)
+	todoValue, err := p.Doc.Path("todos").Map().Get(id)
+	if err != nil {
+		return nil, err
+	}
 	if params.Title != nil {
 		existingTitleValue, _ := todoValue.Map().Get("title")
 		if td.Description, err = spliceTextNode(existingTitleValue.Text(), *params.Title); err != nil {
@@ -247,9 +250,13 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	}
 	for k, v := range params.Annotations {
 		if v == "" {
-			_ = annotationsValue.Map().Delete(k)
+			if err = annotationsValue.Map().Delete(k); err != nil {
+				return nil, errors.Wrap(err, "failed to delete annotation")
+			}
 		} else {
-			_ = annotationsValue.Map().Set(k, v)
+			if err = annotationsValue.Map().Set(k, v); err != nil {
+				return nil, errors.Wrap(err, "failed to set annotation")
+			}
 		}
 	}
 
@@ -261,7 +268,7 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		return nil, errors.Wrap(err, "failed to set updated_by")
 	}
 
-	if _, err := p.Doc.Commit(params.UpdatedBy + " edited todo " + id); err != nil {
+	if _, err := p.Doc.Commit(params.UpdatedBy+" edited todo "+id, automerge.CommitOptions{AllowEmpty: true}); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getTodoInner(todos, id)

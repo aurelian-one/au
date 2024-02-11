@@ -41,8 +41,11 @@ func ResolveConfigDirectory(flagValue string) (string, error) {
 
 func ResolveWorkspaceUid(flagValue string) (string, error) {
 	if flagValue == "" {
-		slog.Debug("no workspace uid provided on the cli - falling back to $" + WorkspaceUidEnvironmentVariable)
+		slog.Debug("no workspace id provided on the cli - falling back to $" + WorkspaceUidEnvironmentVariable)
 		flagValue = os.Getenv(WorkspaceUidEnvironmentVariable)
+	}
+	if flagValue == "" {
+		slog.Debug("no workspace id provided on $" + WorkspaceUidEnvironmentVariable + " falling back to workspace file")
 	}
 	return flagValue, nil
 }
@@ -51,6 +54,9 @@ func ResolveAuthor(flagValue string) (string, error) {
 	if flagValue == "" {
 		slog.Debug("no author provided on the cli - falling back to $" + AuthorEnvironmentVariable)
 		flagValue = os.Getenv(AuthorEnvironmentVariable)
+	}
+	if flagValue == "" {
+		slog.Debug("no author provided on $" + AuthorEnvironmentVariable + " falling back to author on workspace")
 	}
 	return flagValue, nil
 }
