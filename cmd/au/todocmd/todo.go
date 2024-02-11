@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -17,6 +18,35 @@ var Command = &cobra.Command{
 	Use:     "todo",
 	GroupID: "core",
 	Short:   "Create, read, update, and delete Todos",
+}
+
+type marshallableTodo struct {
+	Id           string     `yaml:"id"`
+	CreatedAt    time.Time  `yaml:"created_at"`
+	CreatedBy    string     `yaml:"created_by,omitempty"`
+	UpdatedAt    *time.Time `yaml:"updated_at,omitempty"`
+	UpdatedBy    *string    `yaml:"updated_by,omitempty"`
+	CommentCount int        `yaml:"comment_count"`
+
+	Title       string            `yaml:"title"`
+	Description string            `yaml:"description,omitempty"`
+	Status      string            `yaml:"status"`
+	Annotations map[string]string `yaml:"annotations,omitempty"`
+}
+
+func preMarshalTodo(todo *au.Todo) interface{} {
+	return &marshallableTodo{
+		Id:           todo.Id,
+		CreatedAt:    todo.CreatedAt,
+		CreatedBy:    todo.CreatedBy,
+		UpdatedAt:    todo.UpdatedAt,
+		UpdatedBy:    todo.UpdatedBy,
+		CommentCount: todo.CommentCount,
+		Title:        todo.Title,
+		Description:  todo.Description,
+		Status:       todo.Status,
+		Annotations:  todo.Annotations,
+	}
 }
 
 var getCommand = &cobra.Command{
@@ -42,7 +72,7 @@ var getCommand = &cobra.Command{
 
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(todo)
+		return encoder.Encode(preMarshalTodo(todo))
 	},
 }
 
@@ -75,9 +105,15 @@ var listCommand = &cobra.Command{
 			rankB, _ := strconv.Atoi(b.Annotations[au.AurelianRankAnnotation])
 			return rankB - rankA
 		})
+
+		preMashalledTodos := make([]interface{}, len(todos))
+		for i, t := range todos {
+			preMashalledTodos[i] = preMarshalTodo(&t)
+		}
+
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(todos)
+		return encoder.Encode(preMashalledTodos)
 	},
 }
 
@@ -151,7 +187,7 @@ var createCommand = &cobra.Command{
 		} else {
 			encoder := yaml.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent(2)
-			return encoder.Encode(todo)
+			return encoder.Encode(preMarshalTodo(todo))
 		}
 	},
 }
@@ -240,7 +276,7 @@ var editCommand = &cobra.Command{
 		} else {
 			encoder := yaml.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent(2)
-			return encoder.Encode(todo)
+			return encoder.Encode(preMarshalTodo(todo))
 		}
 	},
 }

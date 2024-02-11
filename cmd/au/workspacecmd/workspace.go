@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -35,6 +36,22 @@ Workspaces are identified by a ULID and have a human-readable alias.
 `),
 }
 
+type marshallableWorkspaceMetadata struct {
+	Id        string    `yaml:"id"`
+	Alias     string    `yaml:"alias"`
+	CreatedAt time.Time `yaml:"created_at"`
+	SizeBytes int64     `yaml:"size_bytes"`
+}
+
+func preMarshalWorkspace(w *au.WorkspaceMeta) *marshallableWorkspaceMetadata {
+	return &marshallableWorkspaceMetadata{
+		Id:        w.Id,
+		Alias:     w.Alias,
+		CreatedAt: w.CreatedAt,
+		SizeBytes: w.SizeBytes,
+	}
+}
+
 var initCommand = &cobra.Command{
 	Use:        "init <alias>",
 	Short:      "Create a new Workspace",
@@ -54,7 +71,7 @@ var initCommand = &cobra.Command{
 		}
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(metadata)
+		return encoder.Encode(preMarshalWorkspace(metadata))
 	},
 }
 
@@ -68,9 +85,15 @@ var listCommand = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		preMarshalledWorkspaces := make([]*marshallableWorkspaceMetadata, len(metadataList))
+		for i, m := range metadataList {
+			preMarshalledWorkspaces[i] = preMarshalWorkspace(&m)
+		}
+
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(metadataList)
+		return encoder.Encode(preMarshalledWorkspaces)
 	},
 }
 
@@ -89,7 +112,7 @@ var getCommand = &cobra.Command{
 		} else {
 			encoder := yaml.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent(2)
-			return encoder.Encode(meta)
+			return encoder.Encode(preMarshalWorkspace(meta))
 		}
 	},
 }
@@ -109,7 +132,7 @@ var useCommand = &cobra.Command{
 			}
 			encoder := yaml.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent(2)
-			return encoder.Encode(metadata)
+			return encoder.Encode(preMarshalWorkspace(metadata))
 		}
 	},
 }
@@ -249,7 +272,7 @@ var syncImportCommand = &cobra.Command{
 			} else {
 				encoder := yaml.NewEncoder(cmd.OutOrStdout())
 				encoder.SetIndent(2)
-				return encoder.Encode(metadata)
+				return encoder.Encode(preMarshalWorkspace(metadata))
 			}
 		} else {
 			return errors.Errorf("non-200 repsonsen code from download api: %d %s", resp.StatusCode(), string(resp.Body))
