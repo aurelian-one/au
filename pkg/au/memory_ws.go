@@ -20,6 +20,13 @@ type inMemoryWorkspaceProvider struct {
 	Lock            sync.Mutex
 }
 
+func NewInMemoryWorkspaceProvider(doc *automerge.Doc) *inMemoryWorkspaceProvider {
+	return &inMemoryWorkspaceProvider{
+		CurrentMetadata: WorkspaceMeta{CreatedAt: time.Now().UTC()},
+		Doc:             doc,
+	}
+}
+
 func (p *inMemoryWorkspaceProvider) Metadata() WorkspaceMeta {
 	return p.CurrentMetadata
 }

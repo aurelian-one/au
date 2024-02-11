@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"hash/crc32"
+	"log/slog"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -213,41 +214,54 @@ This command generates a linear history. To generate a branching history, the wo
 			return errors.New("num must be at least 1")
 		}
 
+		backtrackChanges, err := cmd.Flags().GetInt("backtrack")
+		if err != nil {
+			return err
+		} else if backtrackChanges < 0 {
+			return errors.New("backtrack cannot be negative")
+		}
+
 		ws, err := s.OpenWorkspace(cmd.Context(), w, false)
 		if err != nil {
 			return err
 		}
+		originalDoc := ws.(au.DocProvider).GetDoc()
 
-		cloneWs, err := s.ImportWorkspace(cmd.Context(), ulid.Make().String(), ws.(au.DocProvider).GetDoc().Save())
+		changes, _ := originalDoc.Changes()
+		changeIndex := max(0, len(changes)-1-backtrackChanges)
+
+		slog.Debug("forking workspace")
+		forkedDoc, err := originalDoc.Fork(changes[changeIndex].Hash())
 		if err != nil {
-			return errors.Wrap(err, "failed to clone")
+			return errors.Wrap(err, "failed to fork")
 		}
-
-		ws, err = s.OpenWorkspace(cmd.Context(), cloneWs.Id, true)
-		if err != nil {
-			return err
-		}
-		defer ws.Close()
-
-		dws := ws.(au.DocProvider)
+		inMemoryWorkspace := au.NewInMemoryWorkspaceProvider(forkedDoc)
 		{
-			dws.GetDoc().Path("created_at").Set(time.Now().UTC())
-			oldAliasValue, _ := dws.GetDoc().Path("alias").Get()
-			dws.GetDoc().Path("alias").Set(oldAliasValue.Str() + "with fake data")
+			inMemoryWorkspace.GetDoc().Path("created_at").Set(time.Now().UTC())
+			oldAliasValue, _ := inMemoryWorkspace.GetDoc().Path("alias").Get()
+			inMemoryWorkspace.GetDoc().Path("alias").Set(oldAliasValue.Str() + "with fake data")
 		}
 
 		for numOperations > 0 {
-			n, err := fakeDataGenerators.Next(cmd.Context(), ws)
+			n, err := fakeDataGenerators.Next(cmd.Context(), inMemoryWorkspace)
 			if err != nil {
 				return err
 			}
 			numOperations -= n
 		}
 
-		if err := ws.Flush(); err != nil {
-			return err
+		slog.Debug("merging previous histories")
+		if _, err := inMemoryWorkspace.GetDoc().Merge(originalDoc); err != nil {
+			return errors.Wrap(err, "failed to merge histories")
 		}
 
+		slog.Debug("importing workspace")
+		cloneWs, err := s.ImportWorkspace(cmd.Context(), ulid.Make().String(), inMemoryWorkspace.GetDoc().Save())
+		if err != nil {
+			return errors.Wrap(err, "failed to clone")
+		}
+
+		slog.Debug("workspace imported", "id", cloneWs.Id)
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
 		return encoder.Encode(cloneWs.Id)
@@ -256,6 +270,7 @@ This command generates a linear history. To generate a branching history, the wo
 
 func init() {
 	generateFakeData.Flags().Int("num", 10, "The number of operations to perform")
+	generateFakeData.Flags().Int("backtrack", 0, "The number of changes to rollback to before performing the changes")
 
 	Command.AddCommand(
 		dumpCommand,
