@@ -212,7 +212,7 @@ func TestOpenWorkspaceReadable_success(t *testing.T) {
 	wsp, err := s.OpenWorkspace(context.Background(), ws.Id, false)
 	wsp2 := wsp.(*directoryStorageWorkspace)
 	assert.Nil(t, wsp2.Unlocker)
-	assert.Equal(t, wsp2.Metadata, *ws)
+	assert.Equal(t, wsp2.Metadata(), *ws)
 	assert.Equal(t, filepath.Join(s.(*directoryStorage).Path, ws.Id+Suffix), wsp2.Path)
 	assert.NotNil(t, wsp2.Doc)
 	assert.EqualError(t, wsp2.Flush(), "workspace is not locked for writing")

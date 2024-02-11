@@ -12,6 +12,8 @@ import (
 	"github.com/gofrs/flock"
 	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
+
+	"github.com/aurelian-one/au/internal"
 )
 
 const Suffix = ".automerge"
@@ -69,7 +71,8 @@ func (d *directoryStorage) GetWorkspace(ctx context.Context, id string) (*Worksp
 	if ws, err := d.OpenWorkspace(ctx, id, false); err != nil {
 		return nil, err
 	} else {
-		return &ws.(*directoryStorageWorkspace).Metadata, nil
+		meta := ws.(*directoryStorageWorkspace).Metadata()
+		return &meta, nil
 	}
 }
 
@@ -150,22 +153,6 @@ func (d *directoryStorage) SetCurrentWorkspace(ctx context.Context, id string) e
 	return nil
 }
 
-func (d *directoryStorage) GetCurrentAuthor(ctx context.Context) (string, error) {
-	workspaceId, err := d.GetCurrentWorkspace(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if raw, err := os.ReadFile(filepath.Join(d.Path, workspaceId+".author")); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", errors.Wrap(err, "failed to read author")
-	} else {
-		return strings.TrimSpace(string(raw)), nil
-	}
-}
-
 func (d *directoryStorage) SetCurrentAuthor(ctx context.Context, author string) error {
 	if err := ValidatedAuthor(author); err != nil {
 		return err
@@ -225,9 +212,18 @@ func (d *directoryStorage) OpenWorkspace(ctx context.Context, id string, writeab
 	if createdAtValue, _ := doc.Path("created_at").Get(); createdAtValue.Kind() == automerge.KindTime {
 		meta.CreatedAt = createdAtValue.Time()
 	}
+
+	if raw, err := os.ReadFile(filepath.Join(d.Path, id+".author")); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, errors.Wrap(err, "failed to read author")
+		}
+	} else {
+		meta.CurrentAuthor = internal.Ref(strings.TrimSpace(string(raw)))
+	}
+
 	provider := &directoryStorageWorkspace{
 		Path: path, Unlocker: unlocker, Logger: d.Logger.With("ws", id),
-		Metadata: meta, Doc: &inMemoryWorkspaceProvider{Doc: doc},
+		Doc: &inMemoryWorkspaceProvider{Doc: doc, CurrentMetadata: meta},
 	}
 	unlocker = nil
 	return provider, nil
@@ -275,7 +271,6 @@ type directoryStorageWorkspace struct {
 	Path     string
 	Unlocker func()
 	Logger   *slog.Logger
-	Metadata WorkspaceMeta
 	Doc      *inMemoryWorkspaceProvider
 }
 
@@ -303,6 +298,10 @@ func (d *directoryStorageWorkspace) Close() error {
 	d.Unlocker()
 	d.Unlocker = nil
 	return nil
+}
+
+func (d *directoryStorageWorkspace) Metadata() WorkspaceMeta {
+	return d.Doc.Metadata()
 }
 
 func (d *directoryStorageWorkspace) ListTodos(ctx context.Context) ([]Todo, error) {

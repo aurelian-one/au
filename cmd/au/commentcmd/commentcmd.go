@@ -214,6 +214,10 @@ var createCommand = &cobra.Command{
 
 		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
 			params.CreatedBy = v
+		} else if v := ws.Metadata().CurrentAuthor; v != nil {
+			params.CreatedBy = *v
+		} else {
+			return errors.New("no author set, please set one for the current workspace")
 		}
 
 		if comment, err := ws.CreateComment(cmd.Context(), cmd.Flags().Arg(0), params); err != nil {
@@ -267,6 +271,10 @@ var editCommand = &cobra.Command{
 
 		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
 			params.UpdatedBy = v
+		} else if v := ws.Metadata().CurrentAuthor; v != nil {
+			params.UpdatedBy = *v
+		} else {
+			return errors.New("no author set, please set one for the current workspace")
 		}
 
 		if v, err := cmd.Flags().GetBool("edit"); err != nil {

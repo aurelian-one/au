@@ -37,18 +37,20 @@ Workspaces are identified by a ULID and have a human-readable alias.
 }
 
 type marshallableWorkspaceMetadata struct {
-	Id        string    `yaml:"id"`
-	Alias     string    `yaml:"alias"`
-	CreatedAt time.Time `yaml:"created_at"`
-	SizeBytes int64     `yaml:"size_bytes"`
+	Id            string    `yaml:"id"`
+	Alias         string    `yaml:"alias"`
+	CreatedAt     time.Time `yaml:"created_at"`
+	SizeBytes     int64     `yaml:"size_bytes"`
+	CurrentAuthor *string   `yaml:"current_author,omitempty"`
 }
 
 func preMarshalWorkspace(w *au.WorkspaceMeta) *marshallableWorkspaceMetadata {
 	return &marshallableWorkspaceMetadata{
-		Id:        w.Id,
-		Alias:     w.Alias,
-		CreatedAt: w.CreatedAt,
-		SizeBytes: w.SizeBytes,
+		Id:            w.Id,
+		Alias:         w.Alias,
+		CreatedAt:     w.CreatedAt,
+		SizeBytes:     w.SizeBytes,
+		CurrentAuthor: w.CurrentAuthor,
 	}
 }
 
@@ -298,26 +300,6 @@ var authorSetCommand = &cobra.Command{
 	},
 }
 
-var authorGetCommand = &cobra.Command{
-	Use:   "get-author",
-	Short: "Get the default author for Todos and Comments",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
-		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
-		if w == "" {
-			return errors.New("current workspace not set")
-		}
-		if a, err := s.GetCurrentAuthor(cmd.Context()); err != nil {
-			return err
-		} else if a == "" {
-			return errors.New("default author not set")
-		} else {
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), a)
-			return nil
-		}
-	},
-}
-
 func init() {
 	Command.AddCommand(
 		initCommand,
@@ -329,7 +311,6 @@ func init() {
 		syncClientCommand,
 		syncImportCommand,
 		authorSetCommand,
-		authorGetCommand,
 	)
 }
 
