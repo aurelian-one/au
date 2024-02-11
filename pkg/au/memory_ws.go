@@ -2,7 +2,6 @@ package au
 
 import (
 	"context"
-	"encoding/base64"
 	"mime"
 	"slices"
 	"sync"
@@ -386,11 +385,7 @@ func getCommentInner(comments *automerge.Map, id string) (*Comment, error) {
 		output.MediaType = mediaTypeValue.Str()
 	}
 	if contentValue, _ := item.Map().Get("content"); contentValue.Kind() == automerge.KindBytes {
-		if output.MediaType == DefaultCommentMediaType {
-			output.Content = string(contentValue.Bytes())
-		} else {
-			output.Content = base64.StdEncoding.EncodeToString(contentValue.Bytes())
-		}
+		output.Content = contentValue.Bytes()
 	}
 	if createdAtValue, _ := item.Map().Get("created_at"); createdAtValue.Kind() == automerge.KindTime {
 		output.CreatedAt = createdAtValue.Time().In(time.UTC)

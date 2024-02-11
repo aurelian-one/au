@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 
@@ -19,10 +21,13 @@ func executeAndResetCommand(ctx context.Context, cmd *cobra.Command, args []stri
 	cmd.SetArgs(args)
 	subCmd, err := cmd.ExecuteContextC(ctx)
 	subCmd.SetContext(nil)
+	subCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		f.Value.Set(f.DefValue)
+	})
 	return err
 }
 
-func TestCommand(t *testing.T) {
+func TestComment(t *testing.T) {
 	td, err := os.MkdirTemp(os.TempDir(), "au")
 	assert.NoError(t, err)
 
@@ -80,40 +85,42 @@ func TestCommand(t *testing.T) {
 		assert.Equal(t, "[]\n", buff.String())
 	})
 
-	t.Run("create on todo", func(t *testing.T) {
+	t.Run("create markdown on todo", func(t *testing.T) {
 		buff.Reset()
 		assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", todoId, "--markdown", "Something\nElse"}))
-		var out au.Comment
+		var out map[string]interface{}
 		assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
-		assert.Equal(t, "Something\nElse", out.Content)
-		assert.Equal(t, "text/markdown", out.MediaType)
-		commentId := out.Id
+		assert.Equal(t, "Something\nElse", out["content"])
+		assert.Equal(t, "text/markdown", out["media_type"])
+		commentId := out["id"].(string)
 
 		t.Run("list", func(t *testing.T) {
 			buff.Reset()
+			var out []map[string]interface{}
 			assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"list", todoId}))
-			var out []au.Comment
 			assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
 			assert.Len(t, out, 1)
-			assert.Equal(t, "Something\nElse", out[0].Content)
+			assert.Equal(t, "Something\nElse", out[0]["content"])
 		})
 
 		t.Run("get", func(t *testing.T) {
 			buff.Reset()
 			assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"get", todoId, commentId}))
-			var out au.Comment
 			assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
-			assert.Equal(t, "Something\nElse", out.Content)
-			assert.Equal(t, commentId, out.Id)
+			assert.Equal(t, "Something\nElse", out["content"])
+			assert.Equal(t, commentId, out["id"].(string))
+			assert.Nil(t, out["updated_at"])
+			assert.Nil(t, out["updated_by"])
 		})
 
 		t.Run("edit", func(t *testing.T) {
 			buff.Reset()
 			assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"edit", todoId, commentId, "--markdown", "New Content"}))
-			var out au.Comment
 			assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
-			assert.Equal(t, "New Content", out.Content)
-			assert.Equal(t, commentId, out.Id)
+			assert.Equal(t, "New Content", out["content"])
+			assert.Equal(t, commentId, out["id"].(string))
+			assert.NotNil(t, out["updated_at"])
+			assert.NotNil(t, out["updated_by"])
 		})
 
 		t.Run("delete", func(t *testing.T) {
@@ -125,6 +132,27 @@ func TestCommand(t *testing.T) {
 		t.Run("get again", func(t *testing.T) {
 			buff.Reset()
 			assert.EqualError(t, executeAndResetCommand(ctx, Command, []string{"get", todoId, commentId}), fmt.Sprintf("comment with id '%s' does not exist", commentId))
+		})
+	})
+
+	t.Run("create content from file on todo", func(t *testing.T) {
+		_ = os.WriteFile(filepath.Join(td, "example.html"), []byte("hello world"), 0600)
+
+		buff.Reset()
+		assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"create", todoId, "--content", filepath.Join(td, "example.html")}))
+		var out map[string]interface{}
+		assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
+		assert.Equal(t, "<11 bytes hidden>", out["content"])
+		assert.Equal(t, "text/html; charset=utf-8; filename=\"example.html\"", out["media_type"])
+		commentId := out["id"].(string)
+
+		t.Run("get no raw", func(t *testing.T) {
+			buff.Reset()
+			assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"get", todoId, commentId}))
+			assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &out))
+			assert.Equal(t, "<11 bytes hidden>", out["content"])
+			assert.Equal(t, "text/html; charset=utf-8; filename=\"example.html\"", out["media_type"])
+			assert.Equal(t, commentId, out["id"])
 		})
 	})
 
@@ -164,6 +192,7 @@ func TestCli_todo_authors(t *testing.T) {
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
 	commentId := outStruct["id"].(string)
 	assert.Equal(t, "Example <email@me.com>", outStruct["created_by"])
+	assert.Equal(t, "text/markdown", outStruct["media_type"])
 	assert.Nil(t, outStruct["updated_at"])
 	assert.Nil(t, outStruct["updated_by"])
 
