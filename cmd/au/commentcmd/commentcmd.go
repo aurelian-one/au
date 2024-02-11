@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -24,25 +25,31 @@ var Command = &cobra.Command{
 	Long:    "Each Todo may have a list of comments associated with it. Comments contain annotations, a log of work, attached images or files.",
 }
 
+type marshallableComment struct {
+	Id        string     `yaml:"id"`
+	CreatedAt time.Time  `yaml:"created_at"`
+	CreatedBy string     `yaml:"created_by"`
+	UpdatedAt *time.Time `yaml:"updated_at,omitempty"`
+	UpdatedBy *string    `yaml:"updated_by,omitempty"`
+	MediaType string     `yaml:"media_type"`
+	Content   string     `yaml:"content"`
+}
+
 func preMarshalComment(comment *au.Comment, snipRaw bool) interface{} {
-	out := map[string]interface{}{
-		"id":         comment.Id,
-		"created_at": comment.CreatedAt,
-		"created_by": comment.CreatedBy,
-		"media_type": comment.MediaType,
-	}
-	if comment.UpdatedAt != nil {
-		out["updated_at"] = *comment.UpdatedAt
-	}
-	if comment.UpdatedBy != nil {
-		out["updated_by"] = *comment.UpdatedBy
+	out := &marshallableComment{
+		Id:        comment.Id,
+		CreatedAt: comment.CreatedAt,
+		CreatedBy: comment.CreatedBy,
+		UpdatedAt: comment.UpdatedAt,
+		UpdatedBy: comment.UpdatedBy,
+		MediaType: comment.MediaType,
 	}
 	if comment.MediaType == au.DefaultCommentMediaType {
-		out["content"] = string(comment.Content)
+		out.Content = string(comment.Content)
 	} else if snipRaw {
-		out["content"] = fmt.Sprintf("<%d bytes hidden>", len(comment.Content))
+		out.Content = fmt.Sprintf("<%d bytes hidden>", len(comment.Content))
 	} else {
-		out["content"] = base64.RawStdEncoding.EncodeToString(comment.Content)
+		out.Content = base64.RawStdEncoding.EncodeToString(comment.Content)
 	}
 	return out
 }

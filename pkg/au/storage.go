@@ -28,10 +28,10 @@ type DocProvider interface {
 }
 
 type WorkspaceMeta struct {
-	Id        string    `yaml:"id"`
-	Alias     string    `yaml:"alias"`
-	CreatedAt time.Time `yaml:"created_at"`
-	SizeBytes int64     `yaml:"size_bytes"`
+	Id        string
+	Alias     string
+	CreatedAt time.Time
+	SizeBytes int64
 }
 
 type CreateWorkspaceParams struct {
@@ -56,17 +56,17 @@ type WorkspaceProvider interface {
 }
 
 type Todo struct {
-	Id           string     `yaml:"id"`
-	CreatedAt    time.Time  `yaml:"created_at"`
-	CreatedBy    string     `yaml:"created_by,omitempty"`
-	UpdatedAt    *time.Time `yaml:"updated_at,omitempty"`
-	UpdatedBy    *string    `yaml:"updated_by,omitempty"`
-	CommentCount int        `yaml:"comment_count"`
+	Id           string
+	CreatedAt    time.Time
+	CreatedBy    string
+	UpdatedAt    *time.Time
+	UpdatedBy    *string
+	CommentCount int
 
-	Title       string            `yaml:"title"`
-	Description string            `yaml:"description,omitempty"`
-	Status      string            `yaml:"status"`
-	Annotations map[string]string `yaml:"annotations,omitempty"`
+	Title       string
+	Description string
+	Status      string
+	Annotations map[string]string
 }
 
 type CreateTodoParams struct {
