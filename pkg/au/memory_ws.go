@@ -15,8 +15,13 @@ import (
 )
 
 type inMemoryWorkspaceProvider struct {
-	Doc  *automerge.Doc
-	Lock sync.Mutex
+	CurrentMetadata WorkspaceMeta
+	Doc             *automerge.Doc
+	Lock            sync.Mutex
+}
+
+func (p *inMemoryWorkspaceProvider) Metadata() WorkspaceMeta {
+	return p.CurrentMetadata
 }
 
 func (p *inMemoryWorkspaceProvider) ListTodos(ctx context.Context) ([]Todo, error) {

@@ -37,18 +37,20 @@ Workspaces are identified by a ULID and have a human-readable alias.
 }
 
 type marshallableWorkspaceMetadata struct {
-	Id        string    `yaml:"id"`
-	Alias     string    `yaml:"alias"`
-	CreatedAt time.Time `yaml:"created_at"`
-	SizeBytes int64     `yaml:"size_bytes"`
+	Id            string    `yaml:"id"`
+	Alias         string    `yaml:"alias"`
+	CreatedAt     time.Time `yaml:"created_at"`
+	SizeBytes     int64     `yaml:"size_bytes"`
+	CurrentAuthor *string   `yaml:"current_author,omitempty"`
 }
 
 func preMarshalWorkspace(w *au.WorkspaceMeta) *marshallableWorkspaceMetadata {
 	return &marshallableWorkspaceMetadata{
-		Id:        w.Id,
-		Alias:     w.Alias,
-		CreatedAt: w.CreatedAt,
-		SizeBytes: w.SizeBytes,
+		Id:            w.Id,
+		Alias:         w.Alias,
+		CreatedAt:     w.CreatedAt,
+		SizeBytes:     w.SizeBytes,
+		CurrentAuthor: w.CurrentAuthor,
 	}
 }
 

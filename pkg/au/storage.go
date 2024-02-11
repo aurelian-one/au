@@ -28,10 +28,11 @@ type DocProvider interface {
 }
 
 type WorkspaceMeta struct {
-	Id        string
-	Alias     string
-	CreatedAt time.Time
-	SizeBytes int64
+	Id            string
+	Alias         string
+	CreatedAt     time.Time
+	SizeBytes     int64
+	CurrentAuthor *string
 }
 
 type CreateWorkspaceParams struct {
@@ -39,6 +40,8 @@ type CreateWorkspaceParams struct {
 }
 
 type WorkspaceProvider interface {
+	Metadata() WorkspaceMeta
+
 	ListTodos(ctx context.Context) ([]Todo, error)
 	GetTodo(ctx context.Context, id string) (*Todo, error)
 	CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error)
