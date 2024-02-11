@@ -16,8 +16,6 @@ type StorageProvider interface {
 
 	GetCurrentWorkspace(ctx context.Context) (string, error)
 	SetCurrentWorkspace(ctx context.Context, id string) error
-
-	GetCurrentAuthor(ctx context.Context) (string, error)
 	SetCurrentAuthor(ctx context.Context, author string) error
 
 	OpenWorkspace(ctx context.Context, id string, writeable bool) (WorkspaceProvider, error)

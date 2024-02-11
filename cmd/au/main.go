@@ -108,11 +108,6 @@ func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string
 	if err != nil {
 		return err
 	}
-	if currentAuthor == "" && workspaceValue != "" {
-		if currentAuthor, err = directoryStorage.GetCurrentAuthor(cmd.Context()); err != nil {
-			return err
-		}
-	}
 
 	cmd.SetContext(context.WithValue(cmd.Context(), common.StorageContextKey, directoryStorage))
 	cmd.SetContext(context.WithValue(cmd.Context(), common.CurrentWorkspaceIdContextKey, workspaceValue))

@@ -153,22 +153,6 @@ func (d *directoryStorage) SetCurrentWorkspace(ctx context.Context, id string) e
 	return nil
 }
 
-func (d *directoryStorage) GetCurrentAuthor(ctx context.Context) (string, error) {
-	workspaceId, err := d.GetCurrentWorkspace(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if raw, err := os.ReadFile(filepath.Join(d.Path, workspaceId+".author")); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", errors.Wrap(err, "failed to read author")
-	} else {
-		return strings.TrimSpace(string(raw)), nil
-	}
-}
-
 func (d *directoryStorage) SetCurrentAuthor(ctx context.Context, author string) error {
 	if err := ValidatedAuthor(author); err != nil {
 		return err

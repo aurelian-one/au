@@ -72,6 +72,7 @@ func TestCli_create_and_delete(t *testing.T) {
 	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"get"}))
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
 	assert.Equal(t, workspaceId, outStruct["id"].(string))
+	assert.Nil(t, outStruct["current_author"])
 
 	buff.Reset()
 	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"use", workspaceId}))
@@ -84,6 +85,15 @@ func TestCli_create_and_delete(t *testing.T) {
 	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outSlice))
 	assert.Len(t, outSlice, 1)
 	assert.Equal(t, workspaceId, outSlice[0].(map[string]interface{})["id"])
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"set-author", "Example <name@email>"}))
+
+	buff.Reset()
+	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"get"}))
+	assert.NoError(t, yaml.Unmarshal(buff.Bytes(), &outStruct))
+	assert.Equal(t, workspaceId, outStruct["id"].(string))
+	assert.Equal(t, "Example <name@email>", outStruct["current_author"])
 
 	buff.Reset()
 	assert.NoError(t, executeAndResetCommand(ctx, Command, []string{"delete", workspaceId}))

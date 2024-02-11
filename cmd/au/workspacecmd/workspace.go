@@ -300,26 +300,6 @@ var authorSetCommand = &cobra.Command{
 	},
 }
 
-var authorGetCommand = &cobra.Command{
-	Use:   "get-author",
-	Short: "Get the default author for Todos and Comments",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
-		w := cmd.Context().Value(common.CurrentWorkspaceIdContextKey).(string)
-		if w == "" {
-			return errors.New("current workspace not set")
-		}
-		if a, err := s.GetCurrentAuthor(cmd.Context()); err != nil {
-			return err
-		} else if a == "" {
-			return errors.New("default author not set")
-		} else {
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), a)
-			return nil
-		}
-	},
-}
-
 func init() {
 	Command.AddCommand(
 		initCommand,
@@ -331,7 +311,6 @@ func init() {
 		syncClientCommand,
 		syncImportCommand,
 		authorSetCommand,
-		authorGetCommand,
 	)
 }
 
