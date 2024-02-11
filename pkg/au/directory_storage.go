@@ -320,8 +320,8 @@ func (d *directoryStorageWorkspace) EditTodo(ctx context.Context, id string, par
 	return d.Doc.EditTodo(ctx, id, params)
 }
 
-func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string) error {
-	return d.Doc.DeleteTodo(ctx, id)
+func (d *directoryStorageWorkspace) DeleteTodo(ctx context.Context, id string, params DeleteTodoParams) error {
+	return d.Doc.DeleteTodo(ctx, id, params)
 }
 
 func (d *directoryStorageWorkspace) ListComments(ctx context.Context, todoId string) ([]Comment, error) {
@@ -340,8 +340,8 @@ func (d *directoryStorageWorkspace) EditComment(ctx context.Context, todoId, com
 	return d.Doc.EditComment(ctx, todoId, commentId, params)
 }
 
-func (d *directoryStorageWorkspace) DeleteComment(ctx context.Context, todoId, commentId string) error {
-	return d.Doc.DeleteComment(ctx, todoId, commentId)
+func (d *directoryStorageWorkspace) DeleteComment(ctx context.Context, todoId, commentId string, params DeleteCommentParams) error {
+	return d.Doc.DeleteComment(ctx, todoId, commentId, params)
 }
 
 func (d *directoryStorageWorkspace) GetDoc() *automerge.Doc {

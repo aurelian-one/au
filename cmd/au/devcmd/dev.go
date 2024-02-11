@@ -22,7 +22,7 @@ var Command = &cobra.Command{
 }
 
 var dumpCommand = &cobra.Command{
-	Use:  "export-workspace",
+	Use:  "dump",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
@@ -48,8 +48,8 @@ var dumpCommand = &cobra.Command{
 	},
 }
 
-var historyCommand = &cobra.Command{
-	Use:  "show-workspace-history",
+var generateYamlHistory = &cobra.Command{
+	Use:  "history",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
@@ -92,8 +92,8 @@ var historyCommand = &cobra.Command{
 	},
 }
 
-var generateDotCommand = &cobra.Command{
-	Use:  "generate-dot",
+var generateDotHistory = &cobra.Command{
+	Use:  "history-dot",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s := cmd.Context().Value(common.StorageContextKey).(au.StorageProvider)
@@ -159,9 +159,13 @@ func toTree(item *automerge.Value) interface{} {
 	case automerge.KindStr:
 		return item.Str()
 	case automerge.KindBytes:
+		if len(item.Bytes()) > 1023 {
+			return base64.StdEncoding.EncodeToString(item.Bytes()[:1020]) + "..."
+		}
 		return base64.StdEncoding.EncodeToString(item.Bytes())
 	case automerge.KindText:
-		return item.Text().String()
+		raw, _ := item.Text().Get()
+		return raw
 	case automerge.KindInt64:
 		return item.Int64()
 	case automerge.KindFloat64:
@@ -185,7 +189,7 @@ func toTree(item *automerge.Value) interface{} {
 func init() {
 	Command.AddCommand(
 		dumpCommand,
-		historyCommand,
-		generateDotCommand,
+		generateYamlHistory,
+		generateDotHistory,
 	)
 }

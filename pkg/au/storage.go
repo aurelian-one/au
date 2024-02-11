@@ -44,13 +44,13 @@ type WorkspaceProvider interface {
 	GetTodo(ctx context.Context, id string) (*Todo, error)
 	CreateTodo(ctx context.Context, params CreateTodoParams) (*Todo, error)
 	EditTodo(ctx context.Context, id string, params EditTodoParams) (*Todo, error)
-	DeleteTodo(ctx context.Context, id string) error
+	DeleteTodo(ctx context.Context, id string, params DeleteTodoParams) error
 
 	ListComments(ctx context.Context, todoId string) ([]Comment, error)
 	GetComment(ctx context.Context, todoId, commentId string) (*Comment, error)
 	CreateComment(ctx context.Context, todoId string, params CreateCommentParams) (*Comment, error)
 	EditComment(ctx context.Context, todoId, commentId string, params EditCommentParams) (*Comment, error)
-	DeleteComment(ctx context.Context, todoId, commentId string) error
+	DeleteComment(ctx context.Context, todoId, commentId string, params DeleteCommentParams) error
 
 	Flush() error
 	Close() error
@@ -86,6 +86,10 @@ type EditTodoParams struct {
 	UpdatedBy   string
 }
 
+type DeleteTodoParams struct {
+	DeletedBy string
+}
+
 type Comment struct {
 	Id        string
 	CreatedAt time.Time
@@ -105,4 +109,8 @@ type CreateCommentParams struct {
 type EditCommentParams struct {
 	Content   []byte
 	UpdatedBy string
+}
+
+type DeleteCommentParams struct {
+	DeletedBy string
 }
