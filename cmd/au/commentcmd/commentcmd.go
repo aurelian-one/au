@@ -319,7 +319,17 @@ var deleteCommand = &cobra.Command{
 			return err
 		}
 		defer ws.Close()
-		if err := ws.DeleteComment(cmd.Context(), cmd.Flags().Arg(0), cmd.Flags().Arg(1)); err != nil {
+
+		var params au.DeleteCommentParams
+		if v, ok := cmd.Context().Value(common.CurrentAuthorContextKey).(string); ok && v != "" {
+			params.DeletedBy = v
+		} else if v := ws.Metadata().CurrentAuthor; v != nil {
+			params.DeletedBy = *v
+		} else {
+			return errors.New("no author set, please set one for the current workspace")
+		}
+
+		if err := ws.DeleteComment(cmd.Context(), cmd.Flags().Arg(0), cmd.Flags().Arg(1), params); err != nil {
 			return err
 		} else if err := ws.Flush(); err != nil {
 			return errors.Wrap(err, "failed to flush to file")

@@ -52,7 +52,7 @@ func TestCreateTodo_success(t *testing.T) {
 	}, td.Annotations)
 	if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 		c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
-		assert.Equal(t, "created todo "+td.Id, c.Message())
+		assert.Equal(t, "Example <email@me.com> created todo "+td.Id, c.Message())
 	}
 
 	td2, err := wsp.GetTodo(context.Background(), td.Id)
@@ -121,7 +121,7 @@ func TestEditTodo_success(t *testing.T) {
 	assert.NoError(t, err)
 	if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 		c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
-		assert.Equal(t, "edited todo "+td.Id, c.Message())
+		assert.Equal(t, "Example <email@me.com> edited todo "+td.Id, c.Message())
 	}
 
 	td3, err := wsp.GetTodo(context.Background(), td.Id)
@@ -152,8 +152,8 @@ func TestEditTodo_check_efficient_description(t *testing.T) {
 		assert.NoError(t, err)
 		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
-			assert.Equal(t, "edited todo "+td.Id, c.Message())
-			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 190)
+			assert.Equal(t, "Example <email@me.com> edited todo "+td.Id, c.Message())
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 213)
 		}
 	})
 
@@ -166,8 +166,8 @@ func TestEditTodo_check_efficient_description(t *testing.T) {
 		assert.NoError(t, err)
 		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
-			assert.Equal(t, "edited todo "+td.Id, c.Message())
-			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 157)
+			assert.Equal(t, "Example <email@me.com> edited todo "+td.Id, c.Message())
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 180)
 		}
 	})
 
@@ -180,8 +180,8 @@ func TestEditTodo_check_efficient_description(t *testing.T) {
 		assert.NoError(t, err)
 		if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 			c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
-			assert.Equal(t, "edited todo "+td.Id, c.Message())
-			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 191)
+			assert.Equal(t, "Example <email@me.com> edited todo "+td.Id, c.Message())
+			assert.Len(t, automerge.SaveChanges([]*automerge.Change{c}), 214)
 		}
 	})
 }
@@ -190,7 +190,7 @@ func TestDeleteTodo_missing(t *testing.T) {
 	s := newDirectoryStorage(t)
 	ws, _ := s.CreateWorkspace(context.Background(), CreateWorkspaceParams{Alias: "testing"})
 	wsp, _ := s.OpenWorkspace(context.Background(), ws.Id, true)
-	assert.EqualError(t, wsp.DeleteTodo(context.Background(), "something"), "todo with id 'something' does not exist")
+	assert.EqualError(t, wsp.DeleteTodo(context.Background(), "something", DeleteTodoParams{DeletedBy: "Example <email@me.com>"}), "todo with id 'something' does not exist")
 }
 
 func TestDeleteTodo_success(t *testing.T) {
@@ -203,10 +203,10 @@ func TestDeleteTodo_success(t *testing.T) {
 		CreatedBy:   "Example <email@me.com>",
 	})
 	assert.NoError(t, err)
-	assert.NoError(t, wsp.DeleteTodo(context.Background(), td.Id))
+	assert.NoError(t, wsp.DeleteTodo(context.Background(), td.Id, DeleteTodoParams{DeletedBy: "Example <email@me.com>"}))
 	if h := wsp.(DocProvider).GetDoc().Heads(); assert.Len(t, h, 1) {
 		c, _ := wsp.(DocProvider).GetDoc().Change(h[0])
-		assert.Equal(t, "deleted todo "+td.Id, c.Message())
+		assert.Equal(t, "Example <email@me.com> deleted todo "+td.Id, c.Message())
 	}
 }
 

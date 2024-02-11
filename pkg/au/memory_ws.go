@@ -20,6 +20,13 @@ type inMemoryWorkspaceProvider struct {
 	Lock            sync.Mutex
 }
 
+func NewInMemoryWorkspaceProvider(doc *automerge.Doc) *inMemoryWorkspaceProvider {
+	return &inMemoryWorkspaceProvider{
+		CurrentMetadata: WorkspaceMeta{CreatedAt: time.Now().UTC()},
+		Doc:             doc,
+	}
+}
+
 func (p *inMemoryWorkspaceProvider) Metadata() WorkspaceMeta {
 	return p.CurrentMetadata
 }
@@ -169,7 +176,7 @@ func (p *inMemoryWorkspaceProvider) CreateTodo(ctx context.Context, params Creat
 		_ = newAnnotations.Set(k, v)
 	}
 
-	if _, err := p.Doc.Commit("created todo " + todoId); err != nil {
+	if _, err := p.Doc.Commit(params.CreatedBy + " created todo " + todoId); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getTodoInner(todos, todoId)
@@ -219,7 +226,10 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	if err != nil {
 		return nil, err
 	}
-	todoValue, _ := p.Doc.Path("todos").Map().Get(id)
+	todoValue, err := p.Doc.Path("todos").Map().Get(id)
+	if err != nil {
+		return nil, err
+	}
 	if params.Title != nil {
 		existingTitleValue, _ := todoValue.Map().Get("title")
 		if td.Description, err = spliceTextNode(existingTitleValue.Text(), *params.Title); err != nil {
@@ -247,9 +257,13 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 	}
 	for k, v := range params.Annotations {
 		if v == "" {
-			_ = annotationsValue.Map().Delete(k)
+			if err = annotationsValue.Map().Delete(k); err != nil {
+				return nil, errors.Wrap(err, "failed to delete annotation")
+			}
 		} else {
-			_ = annotationsValue.Map().Set(k, v)
+			if err = annotationsValue.Map().Set(k, v); err != nil {
+				return nil, errors.Wrap(err, "failed to set annotation")
+			}
 		}
 	}
 
@@ -261,7 +275,7 @@ func (p *inMemoryWorkspaceProvider) EditTodo(ctx context.Context, id string, par
 		return nil, errors.Wrap(err, "failed to set updated_by")
 	}
 
-	if _, err := p.Doc.Commit("edited todo " + id); err != nil {
+	if _, err := p.Doc.Commit(params.UpdatedBy+" edited todo "+id, automerge.CommitOptions{AllowEmpty: true}); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getTodoInner(todos, id)
@@ -327,7 +341,11 @@ func longestCommonSuffix(a, b []rune) (endIndex int) {
 	}
 }
 
-func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) error {
+func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string, params DeleteTodoParams) error {
+	if err := ValidatedAuthor(params.DeletedBy); err != nil {
+		return err
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
@@ -339,7 +357,7 @@ func (p *inMemoryWorkspaceProvider) DeleteTodo(ctx context.Context, id string) e
 	if err := todos.Delete(id); err != nil {
 		return err
 	}
-	if _, err := p.Doc.Commit("deleted todo " + id); err != nil {
+	if _, err := p.Doc.Commit(params.DeletedBy + " deleted todo " + id); err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
 	return nil
@@ -481,7 +499,7 @@ func (p *inMemoryWorkspaceProvider) CreateComment(ctx context.Context, todoId st
 		return nil, errors.Wrap(err, "failed to set created_by")
 	}
 
-	if _, err := p.Doc.Commit("created comment " + newCommentId + " in todo " + todoId); err != nil {
+	if _, err := p.Doc.Commit(params.CreatedBy + " created comment " + newCommentId + " in todo " + todoId); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getCommentInner(commentsValue.Map(), newCommentId)
@@ -546,13 +564,17 @@ func (p *inMemoryWorkspaceProvider) EditComment(ctx context.Context, todoId, com
 		return nil, errors.Wrap(err, "failed to set updated_by")
 	}
 
-	if _, err := p.Doc.Commit("edited comment " + commentId + " in todo " + todoId); err != nil {
+	if _, err := p.Doc.Commit(params.UpdatedBy + " edited comment " + commentId + " in todo " + todoId); err != nil {
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 	return getCommentInner(commentsValue.Map(), commentId)
 }
 
-func (p *inMemoryWorkspaceProvider) DeleteComment(ctx context.Context, todoId, commentId string) error {
+func (p *inMemoryWorkspaceProvider) DeleteComment(ctx context.Context, todoId, commentId string, params DeleteCommentParams) error {
+	if err := ValidatedAuthor(params.DeletedBy); err != nil {
+		return err
+	}
+
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 
@@ -570,7 +592,7 @@ func (p *inMemoryWorkspaceProvider) DeleteComment(ctx context.Context, todoId, c
 	} else if err = commentsValue.Map().Delete(commentId); err != nil {
 		return errors.New("failed to delete comment")
 	}
-	if _, err := p.Doc.Commit("deleted comment " + commentId + " in todo " + todoId); err != nil {
+	if _, err := p.Doc.Commit(params.DeletedBy + " deleted comment " + commentId + " in todo " + todoId); err != nil {
 		return errors.Wrap(err, "failed to commit")
 	}
 	return nil
