@@ -26,7 +26,7 @@ func ResolveConfigDirectory(flagValue string, getEnv func(string) string) (strin
 		slog.Debug("no config directory provided on the environment - falling back to default")
 		flagValue = DefaultConfigDir
 	}
-	flagValue = filepath.Clean(os.ExpandEnv(flagValue))
+	flagValue = filepath.Clean(os.Expand(flagValue, getEnv))
 	if !filepath.IsAbs(flagValue) {
 		slog.Debug("config directory is not absolute - resolving it")
 		absValue, err := filepath.Abs(flagValue)
