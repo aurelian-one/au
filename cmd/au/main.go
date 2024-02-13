@@ -79,7 +79,7 @@ func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string
 	if err != nil {
 		return err
 	}
-	directoryValue, err = au.ResolveConfigDirectory(directoryValue)
+	directoryValue, err = au.ResolveConfigDirectory(directoryValue, os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string
 	if err != nil {
 		return err
 	}
-	workspaceValue, err = au.ResolveWorkspaceUid(workspaceValue)
+	workspaceValue, err = au.ResolveWorkspaceUid(workspaceValue, os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func resolveConfigDirectoryAndWorkspace(cmd *cobra.Command, directoryFlag string
 	}
 
 	authorValue, _ := cmd.Flags().GetString(authorFlag)
-	currentAuthor, err := au.ResolveAuthor(authorValue)
+	currentAuthor, err := au.ResolveAuthor(authorValue, os.Getenv)
 	if err != nil {
 		return err
 	}
