@@ -17,10 +17,10 @@ const (
 	DefaultConfigDir                = "$HOME/.au"
 )
 
-func ResolveConfigDirectory(flagValue string) (string, error) {
+func ResolveConfigDirectory(flagValue string, getEnv func(string) string) (string, error) {
 	if flagValue == "" {
 		slog.Debug("no config directory provided on the cli - falling back to $" + ConfigDirEnvironmentVariable)
-		flagValue = os.Getenv(ConfigDirEnvironmentVariable)
+		flagValue = getEnv(ConfigDirEnvironmentVariable)
 	}
 	if flagValue == "" {
 		slog.Debug("no config directory provided on the environment - falling back to default")
@@ -39,10 +39,10 @@ func ResolveConfigDirectory(flagValue string) (string, error) {
 	return flagValue, nil
 }
 
-func ResolveWorkspaceUid(flagValue string) (string, error) {
+func ResolveWorkspaceUid(flagValue string, getEnv func(string) string) (string, error) {
 	if flagValue == "" {
 		slog.Debug("no workspace id provided on the cli - falling back to $" + WorkspaceUidEnvironmentVariable)
-		flagValue = os.Getenv(WorkspaceUidEnvironmentVariable)
+		flagValue = getEnv(WorkspaceUidEnvironmentVariable)
 	}
 	if flagValue == "" {
 		slog.Debug("no workspace id provided on $" + WorkspaceUidEnvironmentVariable + " falling back to workspace file")
@@ -50,10 +50,10 @@ func ResolveWorkspaceUid(flagValue string) (string, error) {
 	return flagValue, nil
 }
 
-func ResolveAuthor(flagValue string) (string, error) {
+func ResolveAuthor(flagValue string, getEnv func(string) string) (string, error) {
 	if flagValue == "" {
 		slog.Debug("no author provided on the cli - falling back to $" + AuthorEnvironmentVariable)
-		flagValue = os.Getenv(AuthorEnvironmentVariable)
+		flagValue = getEnv(AuthorEnvironmentVariable)
 	}
 	if flagValue == "" {
 		slog.Debug("no author provided on $" + AuthorEnvironmentVariable + " falling back to author on workspace")
